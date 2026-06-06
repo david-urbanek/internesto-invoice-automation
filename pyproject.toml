@@ -1,0 +1,15 @@
+[project]
+name = "internesto-invoice-automation"
+version = "0.1.0"
+description = "Kategorizace bankovních transakcí pomocí Gemini API"
+requires-python = ">=3.12"
+dependencies = [
+    "google-generativeai>=0.8.6",
+    "pillow>=12.2.0",
+    "python-dotenv>=1.2.2",
+    "qrcode[pil]>=8.2",
+    "qrplatba>=1.2.0",
+]
+
+[project.scripts]
+kategorizace = "kategorizace:main"
