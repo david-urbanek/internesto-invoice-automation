@@ -12,9 +12,6 @@ wheels/
 # Secrets
 .env
 
-# Output
-transakce_kategorizovane.csv
+# Firemní data (faktury, dokumenty)
+firmy/
 
-faktury/
-
-transactions/
