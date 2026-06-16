@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 kategorizace = "kategorizace:main"
 konfigurace = "kategorizace.konfigurace:main"
+report = "kategorizace.report:main"
 
 [build-system]
 requires = ["setuptools"]

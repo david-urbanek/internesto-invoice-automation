@@ -26,7 +26,14 @@ def nacti_csv(cesta: str) -> list[dict]:
         except csv.Error:
             delimiter = CSV_SEPARATOR
         reader = csv.reader(f, delimiter=delimiter)
-        raw_headers = next(reader)
+        # Přeskočí metadatové řádky (Fio banka exportuje ~9 řádků před záhlavím sloupců)
+        raw_headers = None
+        for row in reader:
+            if len(row) >= 5:
+                raw_headers = row
+                break
+        if raw_headers is None:
+            return []
         headers = []
         seen: dict[str, int] = {}
         for h in raw_headers:

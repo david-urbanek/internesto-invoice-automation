@@ -439,6 +439,26 @@ KATEGORIE = [
     },
 ]
 
+# Kategorie kde faktura objektivně neexistuje nebo není vyžadována.
+# Transakce v těchto kategoriích se nezobrazí v reportu chybějících faktur.
+KATEGORIE_BEZ_FAKTURY: set[str] = {
+    # Mzdy a odvody – dle přehledu mezd
+    "Úklid", "Recepční", "Design", "Výplata majitele",
+    "FU", "Socka", "Zdravka", "DPH",
+    # Nájmy a trvalé příkazy dle smlouvy
+    "V14 nájem", "V14 energie", "V19", "Kotlářská", "Šremer",
+    "Prostory", "Snídaně", "A43", "B53", "A63", "A73", "A82",
+    # Splátky úvěrů
+    "Splátka", "Úrok",
+    # Interní převody a rezervy
+    "Převod", "Převod Výdajový 1", "Převod Výdajový 2",
+    "Rezervní 1", "Rezervní 2", "Rezervní 3",
+    # Hosté a příjmy
+    "Kauce", "Vratka", "Airbnb", "Příjem energie",
+    # Osobní výdaje majitele (nepatří do firemních výdajů)
+    "Výdaje majitele", "Benzín",
+}
+
 ALIASY: dict[str, str] = {
     "Netflix": "Netflix a Spotify", "Spotify": "Netflix a Spotify",
     "Spotify a Netflix": "Netflix a Spotify",

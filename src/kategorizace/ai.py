@@ -45,9 +45,9 @@ def kategorizuj_transakce(
 
     radky = [
         f"{'ID':<4} {'Datum':<12} {'Objem':>10} {'Protiúčet':<18} {'Protistrana':<26} "
-        f"{'Pozn.':<18} {'Zpráva':<28} {'VS':<12} {'Faktura (det.)':<30}"
+        f"{'Už.štítek':<20} {'Zpráva':<28} {'VS':<12} {'Faktura (det.)':<30}"
     ]
-    radky.append("-" * 155)
+    radky.append("-" * 157)
     for i, t in enumerate(transakce):
         predparovana = t.get("Faktura") if t.get("_predparovano") else ""
         radky.append(
@@ -56,7 +56,7 @@ def kategorizuj_transakce(
             f"{t.get('Objem', ''):>10} "
             f"{t.get('Číslo protiúčtu', t.get('Protiúčet', '')):<18} "
             f"{t.get('Název protiúčtu', ''):<26} "
-            f"{t.get('Poznámka', ''):<18} "
+            f"{t.get('Poznámka', ''):<20} "
             f"{t.get('Zpráva pro příjemce', ''):<28} "
             f"{t.get('VS', ''):<12} "
             f"{predparovana:<30}"
@@ -92,7 +92,9 @@ Tyto protiúčty patří vlastním účtům firmy – transakce na ně jsou inte
 ## Instrukce
 1. Přiřaď každé transakci kategorii ze seznamu níže.
 2. Shoda na protiúčtu nebo klíčovém slově má přednost před jménem dodavatele.
-3. Pokud „Poznámka" obsahuje starý/chybný štítek ze ALIASŮ, použij kanonický název.
+3. Sloupec „Už.štítek" je uživatelův vlastní ručně zapsaný popis transakce v internetbankingu —
+   jedná se o nejspolehlivější vodítko ke kategorii. Pokud obsahuje starý/chybný štítek ze ALIASŮ,
+   použij kanonický název.
 4. Přiřazení faktury — pravidla v pořadí priority:
    a) Sloupec „Faktura (det.)" je neprázdný → tato faktura byla deterministicky ověřena, NEMĚŇ ji.
    b) Shoda VS transakce s VS nebo názvem souboru faktury.
