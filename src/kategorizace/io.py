@@ -1,3 +1,12 @@
+"""
+Čtení a zápis souborů: CSV výpisy z Fio banky a vyhledávání faktur.
+
+nacti_csv    – přeskočí metadata hlavičky Fio banky, auto-detekuje oddělovač
+uloz_csv     – zapíše výsledek ve formátu s BOM (kompatibilita s Excel)
+najdi_faktury – rekurzivní glob přes všechny podporované formáty dokladů
+konvertuj_na_pdf – převod obrázku na PDF pro Gemini (který preferuje PDF)
+"""
+
 import csv
 import glob
 import os
@@ -18,6 +27,7 @@ EXTENSIONS_VSECHNY = list(MIME_TYPY.keys()) + [".bmp", ".tiff", ".tif", ".webp",
 
 
 def nacti_csv(cesta: str) -> list[dict]:
+    """Načte CSV výpis z Fio banky. Přeskočí metadata řádky před záhlavím (Fio exportuje ~9 řádků před sloupci)."""
     with open(cesta, encoding="utf-8-sig") as f:
         sample = f.read(4096)
         f.seek(0)

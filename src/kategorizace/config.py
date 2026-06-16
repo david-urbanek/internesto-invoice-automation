@@ -1,3 +1,13 @@
+"""
+Statická konfigurace: kategorie výdajů, firemní účty a aliasy štítků.
+
+Edituj tento soubor když:
+  - přibude nová kategorie nebo dodavatel
+  - Fio banka začne používat jiný název protistrany
+  - přibude nový firemní účet (FIREMNI_UCTY)
+  - uživatel ručně napsal jiný štítek než kanonický název (ALIASY)
+"""
+
 FIRMY_SLOZKA = "firmy"
 CSV_SEPARATOR = ";"
 MODEL = "gemini-2.5-flash"

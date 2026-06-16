@@ -1,3 +1,15 @@
+"""
+Hlavní CLI: orchestrace kategorizace pro všechny firmy paralelně.
+
+Průběh:
+  1. najdi_firmy()    – prohledá firmy/ a sestaví seznam jobů (firma → CSV → výstupní CSV)
+  2. postav_index()   – pro každou firmu paralelně indexuje faktury přes Gemini
+  3. zpracuj_job()    – načte CSV, filtruje faktury dle data, volá AI, uloží výsledek
+  4. ThreadPoolExecutor – firmy i joby uvnitř firem běží paralelně
+
+Výstup se ukládá do firmy/<Firma>/results/<Firma>-<nazev_vypisu>.csv
+"""
+
 import glob
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed

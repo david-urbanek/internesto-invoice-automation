@@ -1,3 +1,15 @@
+"""
+Report chybějících faktur: projde všechny results/ CSV a vypíše transakce bez faktury.
+
+Transakce se zobrazí jen pokud:
+  - Faktura == "NENALEZENO"
+  - Kategorie není v KATEGORIE_BEZ_FAKTURY (mzdy, odvody, nájmy, interní převody…)
+  - Kategorie není prázdná nebo "Neurčeno"
+
+Výstup je terminálová tabulka seskupená podle firmy a výpisu,
+na konci celkový součet chybějících částek.
+"""
+
 import csv
 import glob
 import os

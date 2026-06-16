@@ -1,3 +1,20 @@
+"""
+Index metadat faktur: extrakce přes Gemini, cache v .index.json, deterministické předpárování.
+
+Workflow:
+  postav_index   – načte nebo vytvoří/aktualizuje .index.json ve složce invoices/
+                   Gemini extrahuje: dodavatel, částka, datum, VS, čísla účtů, položky
+                   Soubory se zpracují jen pokud chybí v indexu nebo se změnilo mtime.
+
+  filtruj_faktury – z indexu vybere jen faktury datově relevantní pro daný výpis
+                    (±TOLERANCE_DNI dní), aby Gemini nedostal zbytečně velký kontext
+
+  predparuj      – deterministicky spáruje transakce PŘED odesláním do Gemini:
+                   1. shoda variabilního symbolu (VS transakce = VS na faktuře)
+                   2. shoda základu čísla účtu + přesné částky
+                   Takto spárované transakce Gemini nemůže přepsat (_predparovano=True).
+"""
+
 import json
 import os
 import re
@@ -27,6 +44,7 @@ class _FakturaMetadata(BaseModel):
 
 
 def _extrahuj(cesta: str, client: genai.Client) -> dict:
+    """Pošle fakturu do Gemini a vrátí extrahovaná metadata. PDF se čte přes PyMuPDF jako text; obrázky se pošlou přímo jako bytes."""
     ext = os.path.splitext(cesta)[1].lower()
     parts = []
 
@@ -180,8 +198,14 @@ def _normalizuj_ucet(ucet: str) -> str:
 
 def predparuj(transakce: list[dict], index: dict) -> list[dict]:
     """
-    Deterministicky spáruje transakce s fakturami kde je shoda jednoznačná.
-    Označí je _predparovano=True. Gemini tyto shody nesmí přepsat.
+    Deterministicky spáruje transakce s fakturami před odesláním do Gemini.
+
+    Pořadí priorit:
+      1. VS transakce = VS faktury (po oříznutí vedoucích nul)
+      2. Základ čísla protiúčtu + přesná částka = základ účtu faktury + částka
+
+    Spárované transakce dostanou _predparovano=True — Gemini je nesmí přepsat.
+    Příznak se odstraní z výstupu v ai.kategorizuj_transakce po dokončení.
     """
     # Sestavení vyhledávacích map z indexu
     vs_mapa: dict[str, str] = {}           # vs → fname

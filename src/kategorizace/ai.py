@@ -1,3 +1,19 @@
+"""
+Kategorizace transakcí přes Gemini s využitím indexu faktur.
+
+kategorizuj_transakce – hlavní funkce:
+  1. Spustí deterministické předpárování (faktura_index.predparuj)
+  2. Sestaví prompt: tabulka transakcí + přehled faktur z indexu + seznam kategorií
+  3. Volá Gemini s response_schema=_Vysledek (strukturovaný JSON výstup)
+  4. Zapíše výsledky zpět do transakčních dicts (Kategorie, Faktura, Poznamka, Jistota)
+
+Gemini dostane:
+  - seznam firemních účtů (aby poznal interní převody)
+  - tabulku aliasů (historické/překlepy uživatelských štítků → kanonický název)
+  - přehled faktur z indexu (dodavatel, částka, datum, VS, položky)
+  - kompletní seznam kategorií s popisem, dodavateli a protiúčty
+"""
+
 import os
 
 from google import genai
@@ -37,6 +53,23 @@ def kategorizuj_transakce(
     client: genai.Client,
     firma_index: dict | None = None,
 ) -> list[dict]:
+    """
+    Kategorizuje transakce pomocí Gemini a vrátí je zpět s doplněnými sloupci.
+
+    Args:
+        transakce: řádky z CSV výpisu (list dictů z nacti_csv)
+        faktury_cesty: cesty k fakturám relevantním pro toto období
+        client: inicializovaný Gemini client
+        firma_index: výstup postav_index — pokud je zadán, spustí deterministické předpárování
+
+    Returns:
+        Stejný list dictů s přidanými klíči: Kategorie, Faktura, Poznamka, Jistota.
+        Faktura je název souboru nebo "NENALEZENO" pokud AI žádný nenašla.
+
+    Raises:
+        ValidationError: Gemini vrátil neočekávanou strukturu (handled v cli.py)
+        ValueError: Gemini vrátil prázdnou odpověď — příliš velký kontext
+    """
     if firma_index:
         transakce = predparuj(transakce, firma_index)
 

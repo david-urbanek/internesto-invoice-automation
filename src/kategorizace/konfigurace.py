@@ -1,3 +1,8 @@
+"""
+Příkaz `konfigurace`: vypíše tabulku všech definovaných kategorií z config.py.
+Slouží k rychlé orientaci v tom, co AI kategorizace zná a jaký model používá.
+"""
+
 from rich.console import Console
 from rich.table import Table
 

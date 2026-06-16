@@ -12,6 +12,11 @@ wheels/
 # Secrets
 .env
 
-# Firemní data (faktury, dokumenty)
-firmy/
+# Firemní data - obsah složek (ale ne strukturu)
+firmy/*/transactions/*
+!firmy/*/transactions/.gitkeep
+firmy/*/invoices/*
+!firmy/*/invoices/.gitkeep
+firmy/*/results/*
+!firmy/*/results/.gitkeep
 
