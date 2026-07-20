@@ -14,7 +14,7 @@ import tempfile
 
 from PIL import Image
 
-from .config import CSV_SEPARATOR
+from .config import ALIASY_SLOUPCU_CSV, CSV_SEPARATOR
 
 MIME_TYPY = {
     ".pdf": "application/pdf",
@@ -54,10 +54,26 @@ def nacti_csv(cesta: str) -> list[dict]:
             else:
                 seen[h] = 1
                 headers.append(h)
-        return [
+        radky = [
             {k: v.strip() if isinstance(v, str) else v for k, v in zip(headers, row)}
             for row in reader
         ]
+        return _normalizuj_sloupce(radky)
+
+
+def _normalizuj_sloupce(radky: list[dict]) -> list[dict]:
+    """
+    Doplní ke sloupcům s odlišným názvem (ALIASY_SLOUPCU_CSV, config.py) i
+    kanonický název, který čekají ai.py/prepisy.py (Datum, Objem, Poznámka…).
+    Nemaže originální sloupec, jen přidává alias vedle něj – použije se JEN
+    pokud kanonický sloupec ještě není v řádku přítomný (aby se nepřepsaly
+    skutečné Fio sloupce, které se jmenují stejně jako kanonický název).
+    """
+    for radek in radky:
+        for puvodni, kanonicky in ALIASY_SLOUPCU_CSV.items():
+            if kanonicky not in radek and puvodni in radek:
+                radek[kanonicky] = radek[puvodni]
+    return radky
 
 
 def uloz_csv(cesta: str, radky: list[dict], fieldnames: list[str]):

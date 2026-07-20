@@ -11,8 +11,15 @@ Workflow:
 
   predparuj      – deterministicky spáruje transakce PŘED odesláním do Gemini:
                    1. shoda variabilního symbolu (VS transakce = VS na faktuře)
-                   2. shoda základu čísla účtu + přesné částky
-                   Takto spárované transakce Gemini nemůže přepsat (_predparovano=True).
+                   2. VS / číslo faktury nalezené v textu zprávy pro příjemce
+                   3. shoda základu čísla účtu + částky (s tolerancí ±1 Kč)
+                   Kolize VS (víc faktur se stejným VS) se rozhodují částkou;
+                   nejednoznačné případy se deterministicky nepárují a jdou do AI.
+                   Takto spárované transakce Gemini nemůže přepsat (_predparovano).
+
+  kandidati_pro_transakci – deterministický shortlist faktur pro AI párování
+                   (částka, datové okno, dodavatel, VS) – AI pak vybírá jen
+                   z tohoto úzkého seznamu místo celého indexu.
 """
 
 import json
@@ -43,22 +50,51 @@ class _FakturaMetadata(BaseModel):
     polozky: list[str]
 
 
+def _overeni_extrakce(meta: dict, text: str | None) -> None:
+    """
+    Ověří, že extrahovaný VS a částka se skutečně vyskytují v textu PDF.
+
+    Chrání deterministické párování před halucinacemi extrakce: neověřená
+    hodnota se v predparuj používá jen s dodatečným potvrzením (viz tam).
+    U obrázků a skenů bez textové vrstvy není co ověřovat – extrakci věříme.
+    """
+    if not text or len(text.strip()) < 50:
+        return
+    bez_mezer = re.sub(r"\s", "", text)
+
+    vs = re.sub(r"\D", "", str(meta.get("vs") or ""))
+    if vs:
+        meta["vs_overen"] = vs in bez_mezer
+
+    castka = meta.get("castka")
+    if castka is not None:
+        c = round(float(castka), 2)
+        varianty = {
+            f"{c:.2f}",
+            f"{c:.2f}".replace(".", ","),
+            f"{c:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+        }
+        if c == int(c):
+            varianty.add(str(int(c)))
+        meta["castka_overena"] = any(v in bez_mezer for v in varianty)
+
+
 def _extrahuj(cesta: str, client: genai.Client) -> dict:
-    """Pošle fakturu do Gemini a vrátí extrahovaná metadata. PDF se čte přes PyMuPDF jako text; obrázky se pošlou přímo jako bytes."""
+    """Pošle fakturu do Gemini a vrátí extrahovaná metadata. PDF i obrázky se posílají jako bytes; z PDF se navíc přes PyMuPDF vytáhne text pro zpětné ověření extrakce."""
     ext = os.path.splitext(cesta)[1].lower()
     parts = []
+    text_pdf = None
 
     if ext in MIME_TYPY:
         with open(cesta, "rb") as f:
             parts.append(types.Part.from_bytes(data=f.read(), mime_type=MIME_TYPY[ext]))
-    elif ext == ".pdf":
-        try:
-            doc = fitz.open(cesta)
-            text = "\n".join(p.get_text() for p in doc)[:4000]
-            doc.close()
-        except Exception:
-            return {}
-        parts.append(types.Part.from_text(text=text))
+        if ext == ".pdf":
+            try:
+                doc = fitz.open(cesta)
+                text_pdf = "\n".join(p.get_text() for p in doc)
+                doc.close()
+            except Exception:
+                text_pdf = None
     else:
         return {}
 
@@ -83,7 +119,7 @@ def _extrahuj(cesta: str, client: genai.Client) -> dict:
             ),
         )
         d = response.parsed
-        return {
+        meta = {
             "dodavatel": d.dodavatel,
             "castka": d.castka,
             "datum": d.datum,
@@ -92,6 +128,8 @@ def _extrahuj(cesta: str, client: genai.Client) -> dict:
             "polozky": d.polozky or [],
             "mtime": os.path.getmtime(cesta),
         }
+        _overeni_extrakce(meta, text_pdf)
+        return meta
     except Exception:
         return {"error": True, "mtime": os.path.getmtime(cesta)}
 
@@ -189,6 +227,9 @@ def filtruj_faktury(index: dict, slozka: str, datum_od: datetime, datum_do: date
 # Deterministické předpárování
 # ---------------------------------------------------------------------------
 
+TOLERANCE_CASTKY = 1.0  # Kč – zaokrouhlení a drobné odchylky
+
+
 def _normalizuj_ucet(ucet: str) -> str:
     """Základní číslo účtu bez bankovního kódu a mezer."""
     ucet = re.sub(r"\s", "", ucet)
@@ -196,62 +237,231 @@ def _normalizuj_ucet(ucet: str) -> str:
     return ucet.split("/")[0]
 
 
+def _normalizuj_vs(vs) -> str:
+    """VS jako čisté číslice bez vedoucích nul."""
+    return re.sub(r"\D", "", str(vs or "")).lstrip("0")
+
+
+def _castka_transakce(t: dict) -> float | None:
+    """Absolutní částka transakce ze sloupce Objem, nebo None."""
+    try:
+        return round(abs(float(str(t.get("Objem", "")).replace(" ", "").replace(",", "."))), 2)
+    except (ValueError, TypeError):
+        return None
+
+
 def predparuj(transakce: list[dict], index: dict) -> list[dict]:
     """
     Deterministicky spáruje transakce s fakturami před odesláním do Gemini.
 
     Pořadí priorit:
-      1. VS transakce = VS faktury (po oříznutí vedoucích nul)
-      2. Základ čísla protiúčtu + přesná částka = základ účtu faktury + částka
+      1. VS transakce = VS faktury
+      2. VS / číslo faktury nalezené v textu zprávy pro příjemce (vyžaduje shodu částky)
+      3. Základ čísla protiúčtu + částka s tolerancí ±TOLERANCE_CASTKY
 
-    Spárované transakce dostanou _predparovano=True — Gemini je nesmí přepsat.
+    Ochrany proti chybnému párování:
+      - kolize VS (víc faktur se stejným VS) rozhoduje shoda částky; nejednoznačné
+        případy se nepárují a rozhodne o nich AI z kandidátního shortlistu
+      - známe-li částku faktury i transakce a nesedí, VS shoda nestačí
+      - VS neověřený v textu PDF (vs_overen=False) vyžaduje shodu částky
+      - neověřená částka faktury (castka_overena=False) se nepoužije pro tier 3
+      - jednou spárovaná faktura se deterministicky nepřiřadí druhé transakci
+
+    Spárované transakce dostanou _predparovano=<důvod> — Gemini je nesmí přepsat.
     Příznak se odstraní z výstupu v ai.kategorizuj_transakce po dokončení.
     """
-    # Sestavení vyhledávacích map z indexu
-    vs_mapa: dict[str, str] = {}           # vs → fname
-    ucet_castka_mapa: dict[tuple, str] = {}  # (zaklad_uctu, castka) → fname
+    vs_mapa: dict[str, list[str]] = {}              # vs → [fname, ...]
+    ucet_mapa: dict[str, list[tuple[float, str]]] = {}  # zaklad_uctu → [(castka, fname), ...]
 
     for fname, meta in index.items():
         if meta.get("error"):
             continue
-        vs = str(meta.get("vs") or "").strip().lstrip("0") or None
+        vs = _normalizuj_vs(meta.get("vs"))
         if vs:
-            vs_mapa[vs] = fname
-            vs_mapa[str(meta["vs"]).strip()] = fname  # také s původními nulami
+            vs_mapa.setdefault(vs, []).append(fname)
 
         castka = meta.get("castka")
-        if castka is not None:
+        if castka is not None and meta.get("castka_overena", True):
             castka_r = round(float(castka), 2)
             for ucet in meta.get("ucty") or []:
                 zaklad = _normalizuj_ucet(str(ucet))
                 if zaklad:
-                    ucet_castka_mapa[(zaklad, castka_r)] = fname
+                    ucet_mapa.setdefault(zaklad, []).append((castka_r, fname))
+
+    pouzite: set[str] = set()
+
+    def _vyber_vs(kandidati: list[str], castka: float | None, vyzaduj_castku: bool) -> str | None:
+        """Z faktur se shodným VS vybere jednoznačnou; kolize rozhoduje částka."""
+        zuzeni: list[tuple[str, bool]] = []
+        for fname in dict.fromkeys(kandidati):
+            if fname in pouzite:
+                continue
+            meta = index[fname]
+            fc = meta.get("castka")
+            fc = round(float(fc), 2) if fc is not None else None
+            castka_sedi = castka is not None and fc is not None and abs(fc - castka) <= TOLERANCE_CASTKY
+            if not castka_sedi:
+                if vyzaduj_castku:
+                    continue
+                if fc is not None and castka is not None:
+                    continue  # obě částky známe a nesedí → nech na AI
+                if not meta.get("vs_overen", True):
+                    continue  # částku nelze porovnat a VS není ověřen v textu PDF
+            zuzeni.append((fname, castka_sedi))
+        if len(zuzeni) == 1:
+            return zuzeni[0][0]
+        se_shodou = [f for f, sedi in zuzeni if sedi]
+        if len(se_shodou) == 1:
+            return se_shodou[0]
+        return None
 
     for t in transakce:
         if t.get("Faktura"):
             continue
+        castka = _castka_transakce(t)
 
-        # 1. VS shoda
-        vs_raw = str(t.get("VS", "") or "").strip()
-        if vs_raw:
-            hit = vs_mapa.get(vs_raw) or vs_mapa.get(vs_raw.lstrip("0"))
+        # 1. VS pole transakce
+        vs_t = _normalizuj_vs(t.get("VS"))
+        if vs_t and vs_t in vs_mapa:
+            hit = _vyber_vs(vs_mapa[vs_t], castka, vyzaduj_castku=False)
             if hit:
                 t["Faktura"] = hit
-                t["_predparovano"] = True
+                t["_predparovano"] = "VS"
+                pouzite.add(hit)
                 continue
 
-        # 2. Protiúčet + přesná částka
+        # 2. VS / číslo faktury v textu zprávy (banka VS pole nevyplnila)
+        texty = " ".join(str(t.get(k) or "") for k in ("Zpráva pro příjemce", "Poznámka"))
+        hit = None
+        for seq in re.findall(r"\d{4,10}", texty):
+            seq_n = seq.lstrip("0")
+            if seq_n and seq_n != vs_t and seq_n in vs_mapa:
+                hit = _vyber_vs(vs_mapa[seq_n], castka, vyzaduj_castku=True)
+                if hit:
+                    break
+        if hit:
+            t["Faktura"] = hit
+            t["_predparovano"] = "VS ve zprávě"
+            pouzite.add(hit)
+            continue
+
+        # 3. Protiúčet + částka s tolerancí
         protiucet_raw = str(t.get("Číslo protiúčtu", t.get("Protiúčet", "")) or "")
         zaklad = _normalizuj_ucet(protiucet_raw)
-        try:
-            castka = round(abs(float(str(t.get("Objem", 0)).replace(",", "."))), 2)
-        except (ValueError, TypeError):
-            castka = None
-
-        if zaklad and castka:
-            hit = ucet_castka_mapa.get((zaklad, castka))
-            if hit:
-                t["Faktura"] = hit
-                t["_predparovano"] = True
+        if zaklad and castka is not None:
+            kand = list(dict.fromkeys(
+                f for fc, f in ucet_mapa.get(zaklad, [])
+                if abs(fc - castka) <= TOLERANCE_CASTKY and f not in pouzite
+            ))
+            if len(kand) == 1:
+                t["Faktura"] = kand[0]
+                t["_predparovano"] = "účet+částka"
+                pouzite.add(kand[0])
 
     return transakce
+
+
+# ---------------------------------------------------------------------------
+# Kandidáti pro AI párování
+# ---------------------------------------------------------------------------
+
+_GENERICKA_SLOVA = {"sro", "spol", "czech", "republic", "company", "group",
+                    "servis", "service", "services", "praha", "brno"}
+
+
+def _dodavatel_v_textu(dodavatel: str, text: str) -> bool:
+    """Hrubá shoda jména dodavatele s textem transakce (tokeny ≥ 4 znaky)."""
+    for tok in re.split(r"[^\w]+", dodavatel.lower()):
+        if len(tok) >= 4 and tok not in _GENERICKA_SLOVA and tok in text:
+            return True
+    return False
+
+
+def kandidati_pro_transakci(
+    t: dict,
+    index: dict,
+    povolene: set[str] | None = None,
+    max_kandidatu: int = 6,
+) -> list[dict]:
+    """
+    Deterministický shortlist faktur, ze kterého smí AI pro danou transakci vybírat.
+
+    Faktura se stane kandidátem jen když projde datovým oknem (vystavena max
+    60 dní před platbou a max 14 dní po ní) a získá skóre ≥ 2 z těchto signálů:
+      - částka sedí (±1 Kč: +3) nebo přibližně sedí (±2 %: +2)
+      - shoda VS (+3), VS v názvu souboru nebo VS faktury ve zprávě (+2)
+      - jméno dodavatele se vyskytuje v textu transakce (+2)
+
+    Vrací max_kandidatu nejlépe skórujících záznamů s metadaty a důvody.
+    """
+    castka = _castka_transakce(t)
+    datum_t = _parsuj_datum(str(t.get("Datum", "") or ""))
+    vs_t = _normalizuj_vs(t.get("VS"))
+    text = " ".join(
+        str(t.get(k) or "")
+        for k in ("Název protiúčtu", "Poznámka", "Zpráva pro příjemce")
+    ).lower()
+    cisla_ve_zprave = {s.lstrip("0") for s in re.findall(r"\d{4,10}", text)} - {vs_t, ""}
+
+    vysledky = []
+    for fname, meta in index.items():
+        if meta.get("error"):
+            continue
+        if povolene is not None and fname not in povolene:
+            continue
+
+        datum_f = None
+        if meta.get("datum"):
+            try:
+                datum_f = datetime.fromisoformat(meta["datum"])
+            except ValueError:
+                pass
+        if datum_t and datum_f and not (-14 <= (datum_t - datum_f).days <= 60):
+            continue
+
+        skore = 0
+        duvody = []
+
+        fc = meta.get("castka")
+        fc = round(float(fc), 2) if fc is not None else None
+        if castka is not None and fc is not None:
+            if abs(fc - castka) <= TOLERANCE_CASTKY:
+                skore += 3
+                duvody.append("částka sedí")
+            elif abs(fc - castka) <= 0.02 * max(fc, castka):
+                skore += 2
+                duvody.append("částka přibližně sedí")
+
+        vs_f = _normalizuj_vs(meta.get("vs"))
+        if vs_t and vs_f and (
+            vs_t == vs_f
+            or (len(min(vs_t, vs_f, key=len)) >= 5 and (vs_t in vs_f or vs_f in vs_t))
+        ):
+            skore += 3
+            duvody.append("shoda VS")
+        elif vs_t and len(vs_t) >= 5 and vs_t in re.sub(r"\D", "", fname):
+            skore += 2
+            duvody.append("VS v názvu souboru")
+        elif vs_f and vs_f in cisla_ve_zprave:
+            skore += 2
+            duvody.append("VS ve zprávě")
+
+        dodavatel = str(meta.get("dodavatel") or "")
+        if dodavatel and _dodavatel_v_textu(dodavatel, text):
+            skore += 2
+            duvody.append("dodavatel se shoduje")
+
+        if skore >= 2:
+            vysledky.append({
+                "soubor": fname,
+                "dodavatel": dodavatel,
+                "castka": fc,
+                "datum": meta.get("datum"),
+                "vs": meta.get("vs"),
+                "polozky": meta.get("polozky") or [],
+                "duvody": duvody,
+                "skore": skore,
+            })
+
+    vysledky.sort(key=lambda k: -k["skore"])
+    return vysledky[:max_kandidatu]

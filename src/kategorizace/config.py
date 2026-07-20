@@ -12,20 +12,69 @@ FIRMY_SLOZKA = "firmy"
 CSV_SEPARATOR = ";"
 MODEL = "gemini-2.5-flash"
 
+# ---------------------------------------------------------------------------
+# Aliasy názvů sloupců v CSV výpisech
+# ---------------------------------------------------------------------------
+# Kategorizace (ai.py) a přepisy (prepisy.py) čekají kanonické názvy sloupců
+# z Fio bankovního výpisu (Datum, Objem, Poznámka, VS, Provedl…). Některé
+# zdroje (např. pokladní kniha) mají stejný obsah, ale jiné názvy sloupců –
+# tady se namapují na kanonický název, PŘIDÁ se jako nový klíč vedle
+# původního (žádná data se neztratí, výstupní CSV má oba). Aplikuje se
+# v io.nacti_csv pro každý řádek, jen pokud kanonický klíč ještě neexistuje.
+ALIASY_SLOUPCU_CSV: dict[str, str] = {
+    "Datum platby": "Datum",
+    "Příjem/Výdej": "Objem",
+    "Popis": "Poznámka",
+    "VS dokladu": "VS",
+    "Uživatel": "Provedl",
+}
+
+# Všechny interní účty skupiny (Fio, MONETA, Raiffeisen, Air Bank).
+# Transakce s protiúčtem z tohoto seznamu je interní převod → kategorie
+# "Převod", POKUD přiřazená kategorie daný protiúčet sama nedeklaruje
+# v protiucty (Splátka, Výplata majitele, Kotlářská…) – viz
+# aplikuj_interni_prevod() v prepisy.py.
 FIREMNI_UCTY = {
-    "2200973033": "RD Group s.r.o. | Příjmový 1",
-    "2901813198": "RD Group s.r.o. | Výdajový 1",
-    "2601728813": "RD Group s.r.o. | Výdajový 2",
-    "2901321222": "RD Group s.r.o. | Ostatní",
-    "2402351507": "RD Group s.r.o. | Rezervní 1 (poplatky)",
-    "2102351505": "RD Group s.r.o. | Rezervní 2 (daň z příjmu)",
-    "2602411244": "RD Group s.r.o. | Rezervní 3",
-    "2203097403": "RD Group s.r.o. | Premier / odklady",
-    "2301240402": "Nesty Services s.r.o. | Příjmový 1",
-    "2201422348": "Casa Libre s.r.o. | Příjmový 1",
-    "4877715":    "RD Group s.r.o. | úvěrový účet (Raiffeisen)",
-    "1177419020": "Radek Danč (jednatel / společník – Air Bank)",
-    "5845640002": "Ing. Radek Danč (společník)",
+    # RD Group s.r.o.
+    "2200973033": "RD Group s.r.o. | Příjmový 1 CZK (Fio)",
+    "2301780732": "RD Group s.r.o. | Příjmový 2 EUR (Fio)",
+    "2901813198": "RD Group s.r.o. | Výdajový 1 CZK (Fio)",
+    "2601728813": "RD Group s.r.o. | Výdajový 2 CZK (Fio)",
+    "2901321222": "RD Group s.r.o. | Ostatní CZK (Fio)",
+    "2203097403": "RD Group s.r.o. | Premier Fond (Fio)",
+    "2402351507": "RD Group s.r.o. | Rezervní 1 (Fio)",
+    "2102351505": "RD Group s.r.o. | Rezervní 2 (Fio)",
+    "2602411244": "RD Group s.r.o. | Rezervní 3 (Fio)",
+    "4877715":    "RD Group s.r.o. | Příjmový / úvěrový (Raiffeisen 5500)",
+    "6102102232": "RD Group s.r.o. | Raiffeisen",
+    "6430097786": "RD Group s.r.o. | Raiffeisen (úvěr)",
+    "249102969":  "RD Group s.r.o. | MONETA (úvěr)",
+    "249102977":  "RD Group s.r.o. | MONETA",
+    "261119667":  "RD Group s.r.o. | MONETA",
+    # Casa Libre s.r.o.
+    "2201422348": "Casa Libre s.r.o. | Příjmový 1 CZK (Fio)",
+    "2401780748": "Casa Libre s.r.o. | Příjmový 1 EUR (Fio)",
+    "2601813209": "Casa Libre s.r.o. | Výdajový 1 CZK (Fio)",
+    "2002351495": "Casa Libre s.r.o. | Rezervní 1 (Fio)",
+    "2102351492": "Casa Libre s.r.o. | Rezervní 2 (Fio)",
+    "249103128":  "Casa Libre s.r.o. | MONETA (úvěr)",
+    "249103136":  "Casa Libre s.r.o. | MONETA",
+    "276191995":  "Casa Libre s.r.o. | MONETA",
+    # Nesty Services s.r.o.
+    "2301240402": "Nesty Services s.r.o. | Příjmový 1 CZK (Fio)",
+    "2201830907": "Nesty Services s.r.o. | Výdajový 1 CZK (Fio)",
+    "2301780716": "Nesty Services s.r.o. | Ostatní CZK (Fio)",
+    "2802351514": "Nesty Services s.r.o. | Rezervní 1 CZK (Fio)",
+    "249099667":  "Nesty Services s.r.o. | MONETA (úvěr)",
+    "249099739":  "Nesty Services s.r.o. | MONETA",
+    # Fyzické osoby
+    "2400860172": "Radek Danč | FO (Fio)",
+    "1177419055": "Radek Danč | FO (Air Bank)",
+    "1177419047": "Radek Danč | FO (Air Bank)",
+    "1177419020": "Radek Danč | jednatel / společník (Air Bank)",
+    "5845640002": "Ing. Radek Danč | společník",
+    "2401715997": "Tomáš Opravil (Fio)",
+    "2402543103": "Tomáš Opravil (Fio)",
 }
 
 KATEGORIE = [
@@ -90,9 +139,9 @@ KATEGORIE = [
     {
         "nazev": "Ostatní služby",
         "popis": "Různé služby nezařaditelné jinam (callcentrum, pošta, drobné poplatky).",
-        "dodavatele": ["Daktela", "AirWallet", "Česká pošta", "Multisport"],
+        "dodavatele": ["Daktela", "AirWallet", "Česká pošta", "Multisport", "Coma Jurny", "Burda Design"],
         "protiucty": ["2078745001", "2104561127", "170158265"],
-        "klicova_slova": ["FAKTURUJEME VAM ZA", "AIRWALLET"],
+        "klicova_slova": ["FAKTURUJEME VAM ZA", "AIRWALLET", "Coma Jurny", "Burda Design"],
     },
     {
         "nazev": "Jídlo",
@@ -105,9 +154,9 @@ KATEGORIE = [
     {
         "nazev": "Reprezentace",
         "popis": "Reprezentace – dárky, pohoštění, drobné občerstvení.",
-        "dodavatele": ["Qerko", "Matějovo pekařství", "Pivnice", "J&T banka cafe", "Alza"],
+        "dodavatele": ["Qerko", "Matějovo pekařství", "Pivnice", "J&T banka cafe"],
         "protiucty": ["2400406244"],
-        "klicova_slova": ["dárek", "Reprezentace"],
+        "klicova_slova": ["dárek", "Reprezentace", "narozeniny", "teambuilding", "svátek"],
     },
     {
         "nazev": "Kancelář",
@@ -126,7 +175,8 @@ KATEGORIE = [
                        "Sarayova Lucie", "Hejna Veronika", "Pospisilova Marie",
                        "Hlouskova Marcela", "Hadbavna Julia Sofia", "Podlouckova Katerina",
                        "Kuswitova Shabrina", "Necasova Lucie", "Bostik Zbynek",
-                       "Marosova", "Dobos", "Soudni exekutor", "Urad prace"],
+                       "Marosova", "Dobos", "Soudni exekutor", "Urad prace",
+                       "Drackova Michaela", "Hyzova Natalia", "Melichova Emma"],
         "protiucty": ["354003954", "6015-229761", "115-1648560267", "3055051183",
                       "3799998003", "129886578"],
     },
@@ -228,7 +278,7 @@ KATEGORIE = [
         "nazev": "Zvláštní výdaj",
         "popis": "Dodatečné T-Mobile položky / mimořádné výdaje nezařaditelné jinam. Dle FA.",
         "dodavatele": ["T-Mobile"],
-        "protiucty": ["19-2235210247"],
+        "protiucty": ["19-2235210247", "2132464033"],
         "klicova_slova": ["T-MOBILE INKASO"],
     },
 
@@ -278,17 +328,30 @@ KATEGORIE = [
     },
     {
         "nazev": "V19",
-        "popis": "Nájem + energie objekt Vlhká 19. Dle smlouvy.",
+        "popis": ("Nájem + energie objekt Vlhká 19. Dle smlouvy. "
+                  "POZN.: účet 327457117 sdílí i Kotlářská a Garant – rozhoduje "
+                  "primárně uživatelský štítek (Poznámka)/klíčové slovo, ne protiúčet sám."),
         "dodavatele": [],
         "protiucty": ["327457117", "10014-1703621"],
         "klicova_slova": ["Vlhká 19", "Vlhká"],
     },
     {
         "nazev": "Kotlářská",
-        "popis": "Nájem + energie objekt Kotlářská 12. Dle smlouvy.",
+        "popis": ("Nájem + energie objekt Kotlářská 12. Dle smlouvy. "
+                  "POZN.: účet 327457117 sdílí i V19 a Garant – rozhoduje "
+                  "primárně uživatelský štítek (Poznámka)/klíčové slovo, ne protiúčet sám."),
         "dodavatele": [],
         "protiucty": ["327457117", "2201422348"],
         "klicova_slova": ["Kotlářská"],
+    },
+    {
+        "nazev": "Garant",
+        "popis": ("Garantovaná platba (výplata garantovi nájmu/výnosu, typicky Radek Danč). "
+                  "Účet 327457117 je sdílený s V19/Kotlářská – rozhoduj VÝHRADNĚ podle "
+                  "uživatelského štítku (Poznámka) 'Garant', protiúčet sám o kategorii nerozhoduje."),
+        "dodavatele": ["Radek Danč"],
+        "protiucty": ["327457117"],
+        "klicova_slova": ["Garant"],
     },
     {
         "nazev": "V14 nájem",
@@ -376,7 +439,7 @@ KATEGORIE = [
         "popis": ("Vybavení a rekonstrukce jednotky V24 – nábytek/dekorace označené V24. "
                   "POZN.: štítek se v datech používá i pro mezifiremní ubytovací fakturaci "
                   "(účet 2502904199) – ověřit při čištění."),
-        "dodavatele": ["JYSK", "Alza", "IKEA", "Mobelix", "Bonami", "Pepco", "Sinsay", "Beliani"],
+        "dodavatele": ["JYSK", "IKEA", "Mobelix", "Bonami", "Pepco", "Sinsay", "Beliani", "Alza"],
         "protiucty": ["2171532", "2000295311"],
         "klicova_slova": ["V24", "Spilberk C79"],
     },
@@ -386,7 +449,10 @@ KATEGORIE = [
     # =======================================================================
     {
         "nazev": "Vratka",
-        "popis": "Vrácení plateb hostům (na příkaz hosta, doklad v interním systému).",
+        "popis": ("Vrácení plateb hostům/zákazníkům – VÝHRADNĚ odchozí platba (záporná částka) "
+                  "směrem k zákazníkovi (na příkaz hosta, doklad v interním systému). "
+                  "POZOR: příchozí refundace od dodavatelů (JYSK, Alza, IKEA…) NEJSOU Vratka – "
+                  "patří do kategorie původního výdaje (např. Dekorace)."),
         "dodavatele": [],
         "klicova_slova": ["Vratka", "Vrácení", "rez."],
     },
@@ -470,7 +536,6 @@ KATEGORIE_BEZ_FAKTURY: set[str] = {
 }
 
 ALIASY: dict[str, str] = {
-    "Netflix": "Netflix a Spotify", "Spotify": "Netflix a Spotify",
     "Spotify a Netflix": "Netflix a Spotify",
     "Chrištof": "Prádelna",
     "Uklid": "Úklid",
@@ -538,3 +603,100 @@ KATEGORIE_PRIJMY_A_MAJITEL = [
         "klicova_slova": [],
     },
 ]
+
+# ---------------------------------------------------------------------------
+# Přepis kategorie 'Jídlo' podle karty (sloupec "Provedl") – účet Nesty Ostatní
+# ---------------------------------------------------------------------------
+# Karetní nákupy jídla (Lidl, Rohlik.cz apod.) na tomto účtu jsou ve skutečnosti
+# osobní útraty konkrétní osoby, ne firemní provozní výdaj. AI je zařadí do
+# kategorie "Jídlo" – aplikuj_jidlo_podle_provedl() v prepisy.py to pak přepíše
+# podle toho, kdo transakci provedl.
+#
+UCET_NESTY_OSTATNI = "2301780716"
+
+# Podřetězec ve sloupci "Provedl" (hledá se case-insensitive) → nová kategorie.
+# Aplikuje se JEN pokud AI transakci nejdřív zařadila do kategorie "Jídlo".
+JIDLO_PODLE_PROVEDL: dict[str, str] = {
+    "danč": "Výdaje majitele",
+    "danc": "Výdaje majitele",
+    "gardášová": "Recepční",
+    "gardasova": "Recepční",
+}
+
+# ---------------------------------------------------------------------------
+# Omezená nabídka kategorií pro konkrétní účty/zdroje
+# ---------------------------------------------------------------------------
+# Pro výpisy, kde historicky platí jen omezená podmnožina kategorií (nebo
+# naopak jedna konkrétní kategorie tam NIKDY nepatří), se AI
+# (ai.kategorizuj_transakce) pošle upravená nabídka místo celého seznamu
+# KATEGORIE – viz omezene_kategorie_pro_soubor() v prepisy.py.
+#
+# Klíč slovníku je číslo účtu, pokud existuje (jedinečné přes všechny firmy,
+# viz FIREMNI_UCTY), jinak jen popisný identifikátor záznamu (u zdrojů bez
+# bankovního účtu, např. hotovostní pokladna). "klicove_slovo" se použije
+# k rozpoznání výpisu podle názvu souboru, když soubor nemá číslo účtu
+# v názvu (např. ručně přejmenované "RD Ostatní (1).csv") – viz
+# _soubor_patri_uctu() v prepisy.py.
+#
+# Každý záznam má buď:
+#   "kategorie"  – uzavřený POVOLOVACÍ seznam, AI smí vybrat jen z něj
+#   "vyloucene"  – VYLUČOVACÍ seznam, AI smí vybrat cokoliv KROMĚ těchto
+OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
+    "2901321222": {  # RD Group s.r.o. | Ostatní CZK (Fio)
+        "klicove_slovo": "ostatni",
+        "kategorie": ["Benzín", "Výdaje majitele", "Převod"],
+    },
+    "POKLADNA_HOTOVOST": {  # hotovostní pokladna – bez čísla účtu
+        "klicove_slovo": "pokladna",
+        # Zpětná analýza historicky schválených výpisů: hotovostní výběry/dary
+        # pro Radka Danče ("Party - Anet", "Radek osobni") byly vždy "Převod",
+        # nikdy "Výdaje majitele" – ten je vázaný na jeho osobní bankovní účet
+        # (670100-2200894925), ne na sdílenou pokladnu s personálem.
+        "vyloucene": ["Výdaje majitele"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Deterministický přepis podle Poznámky na účtu RD Příjmový
+# ---------------------------------------------------------------------------
+# Na tomto účtu (RD Group s.r.o. | Příjmový 1, FIREMNI_UCTY["2200973033"])
+# transakce se štítkem (Poznámka) "pronájem bytu" vždy patří k nájmu objektu
+# Kotlářská – i když protiúčet bývá sdílený s Casa Libre Příjmový a AI ho
+# proto mate s obecným interním převodem. Viz
+# aplikuj_kotlarska_pronajem_bytu() v prepisy.py.
+UCET_RD_PRIJMOVY = "2200973033"
+KLICOVA_SLOVA_KOTLARSKA_RD_PRIJMOVY: list[str] = ["pronajem bytu"]
+
+# ---------------------------------------------------------------------------
+# Přepis kategorie 'Telefony' – jen nejvyšší platba T-Mobile je "Telefony"
+# ---------------------------------------------------------------------------
+# Na účtu T-Mobile bývá víc plateb (pravidelný paušál + dodatečné položky).
+# Kategorie "Telefony" patří jen platbě s nejvyšší částkou v daném výpisu,
+# všechny ostatní platby T-Mobile jsou "Zvláštní výdaj" – viz
+# aplikuj_telefony_nejvyssi_castka() v prepisy.py.
+UCET_TMOBILE = "19-2235210247"
+
+# ---------------------------------------------------------------------------
+# Dodavatelé s pevnou kategorií bez ohledu na znaménko částky
+# ---------------------------------------------------------------------------
+# Podřetězec v textu transakce (protistrana/poznámka/zpráva, hledá se
+# case-insensitive) → kategorie, která platí VŽDY – ať jde o nákup (mínus),
+# nebo vratku/refundaci (plus). Viz aplikuj_vzdy_dodavatel() v prepisy.py.
+VZDY_DODAVATEL_KATEGORIE: dict[str, str] = {
+    "alza": "Dekorace",
+    "silmet": "Benzín",
+    "zerogas": "Benzín",
+}
+
+# ---------------------------------------------------------------------------
+# Výjimky z VZDY_DODAVATEL_KATEGORIE podle dalšího klíčového slova v textu
+# ---------------------------------------------------------------------------
+# Pravidlo výše NENÍ úplně bezpodmínečné: pokud text obsahuje i tohle další
+# klíčové slovo, použije se místo pevné kategorie dodavatele tahle
+# specifičtější kategorie. Např. "Alza" je vždy "Dekorace", ALE pokud
+# Poznámka obsahuje i "V24" (nákup vybavení pro jednotku V24), je to "V24".
+# Kontroluje se JEN u dodavatele, který výjimku má – klíč musí odpovídat
+# klíči ve VZDY_DODAVATEL_KATEGORIE. Viz aplikuj_vzdy_dodavatel() v prepisy.py.
+VYJIMKY_VZDY_DODAVATEL: dict[str, list[tuple[str, str]]] = {
+    "alza": [("v24", "V24")],
+}

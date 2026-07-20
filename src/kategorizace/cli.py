@@ -24,6 +24,16 @@ from .ai import kategorizuj_transakce
 from .config import FIRMY_SLOZKA
 from .faktura_index import filtruj_faktury, postav_index, rozsah_dat
 from .io import najdi_faktury, nacti_csv, uloz_csv
+from .prepisy import (
+    aplikuj_interni_prevod,
+    aplikuj_jidlo_podle_provedl,
+    aplikuj_kotlarska_pronajem_bytu,
+    aplikuj_pradlo_pokladna,
+    aplikuj_prevod_zpetna_platba,
+    aplikuj_telefony_nejvyssi_castka,
+    aplikuj_vzdy_dodavatel,
+    omezene_kategorie_pro_soubor,
+)
 
 load_dotenv()
 
@@ -60,6 +70,7 @@ def zpracuj_job(
     job: dict,
     invoices_slozka: str,
     firma_index: dict,
+    firma_nazev: str,
     progress: Progress,
     console: Console,
     client: genai.Client,
@@ -85,7 +96,17 @@ def zpracuj_job(
         if not transakce:
             progress.update(task_id, completed=1, description=f"[yellow]⚠ {job['label']}[/yellow]  Prázdný CSV soubor")
             return
-        transakce = kategorizuj_transakce(transakce, faktury, client, firma_index=firma_index)
+        omezene_kategorie = omezene_kategorie_pro_soubor(job["csv"])
+        transakce = kategorizuj_transakce(
+            transakce, faktury, client, firma_index=firma_index, omezene_kategorie=omezene_kategorie,
+        )
+        transakce = aplikuj_interni_prevod(transakce)
+        transakce = aplikuj_kotlarska_pronajem_bytu(transakce, job["csv"], firma_nazev)
+        transakce = aplikuj_jidlo_podle_provedl(transakce, job["csv"], firma_nazev)
+        transakce = aplikuj_pradlo_pokladna(transakce, firma_nazev)
+        transakce = aplikuj_prevod_zpetna_platba(transakce)
+        transakce = aplikuj_telefony_nejvyssi_castka(transakce)
+        transakce = aplikuj_vzdy_dodavatel(transakce, omezene_kategorie=omezene_kategorie)
         os.makedirs(os.path.dirname(job["vystup"]), exist_ok=True)
         uloz_csv(job["vystup"], transakce, list(transakce[0].keys()))
         progress.update(
@@ -140,7 +161,7 @@ def main():
     console.print()
 
     vsechny_joby = [
-        (job, firma["invoices"], firma["index"])
+        (job, firma["invoices"], firma["index"], firma["nazev"])
         for firma in firmy
         for job in firma["joby"]
     ]
@@ -158,8 +179,8 @@ def main():
         celkovy_task = progress.add_task("[bold]Celkem[/bold]", total=celkem_jobu)
         with ThreadPoolExecutor(max_workers=celkem_jobu) as executor:
             futures = {
-                executor.submit(zpracuj_job, job, inv_slozka, inv_index, progress, console, client): job
-                for job, inv_slozka, inv_index in vsechny_joby
+                executor.submit(zpracuj_job, job, inv_slozka, inv_index, firma_nazev, progress, console, client): job
+                for job, inv_slozka, inv_index, firma_nazev in vsechny_joby
             }
             for future in as_completed(futures):
                 job = futures[future]
