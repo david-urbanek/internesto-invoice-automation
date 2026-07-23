@@ -19,4 +19,5 @@ firmy/*/invoices/*
 !firmy/*/invoices/.gitkeep
 firmy/*/results/*
 !firmy/*/results/.gitkeep
+data/*
 

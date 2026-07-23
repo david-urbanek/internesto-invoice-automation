@@ -208,12 +208,19 @@ def kategorizuj_transakce(
                 t["Faktura"] = "NENALEZENO"
                 t["Parovani"] = "bez indexu faktur"
 
+    # Transakce už zkategorizované deterministickou vrstvou
+    # (deterministika.aplikuj_deterministickou_kategorizaci) do AI neposílej.
+    k_ai = [i for i, t in enumerate(transakce) if not t.get("Kategorie")]
+    if not k_ai:
+        return _doplneno(transakce)
+
     radky = [
         f"{'ID':<4} {'Datum':<12} {'Objem':>10} {'Protiúčet':<18} {'Protistrana':<26} "
         f"{'Už.štítek':<20} {'Zpráva':<28} {'VS':<12} {'Faktura':<30}"
     ]
     radky.append("-" * 157)
-    for i, t in enumerate(transakce):
+    for i in k_ai:
+        t = transakce[i]
         faktura = t.get("Faktura", "")
         radky.append(
             f"{i:<4} "
@@ -244,8 +251,13 @@ def kategorizuj_transakce(
     firemni_ucty_text = "\n".join(
         f"  {c} → {n}" for c, n in FIREMNI_UCTY.items()
     )
+    # Na výpisech s uzavřeným seznamem kategorií posílej jen aliasy, jejichž
+    # cíl je v seznamu – jinak prompt obsahuje protichůdné instrukce (např.
+    # "Alza" → "Dekorace" na účtu, kde Dekorace není povolená) a AI vrací
+    # kategorie, které se pak zahazují na "Neurčeno".
     aliasy_text = "\n".join(
         f"  \"{s}\" → \"{k}\"" for s, k in ALIASY.items()
+        if omezene_kategorie is None or k in omezene_kategorie
     )
 
     omezovaci_instrukce = ""
@@ -286,8 +298,11 @@ Tyto protiúčty patří vlastním účtům firmy – transakce na ně jsou inte
    použij kanonický název.
 4. Sloupec „Faktura" obsahuje již spárovanou fakturu (párování NEMĚNÍŠ). Pokud je vyplněná,
    použij dodavatele a položky této faktury z PŘEHLEDU FAKTUR jako silné vodítko ke kategorii.
-5. Uveď pravděpodobnost jistoty 0–100.
-6. Pokud kategorii nelze určit, použij „Neurčeno".{omezovaci_instrukce}
+5. Karetní platby (Zpráva/štítek začíná „Nákup:", chybí protiúčet) jsou nákupy u obchodníka –
+   NIKDY to není interní „Převod", ani když „Název protiúčtu" obsahuje název vlastní firmy
+   (u karetních plateb tam banka vyplňuje název VLASTNÍHO účtu, ne protistrany).
+6. Uveď pravděpodobnost jistoty 0–100.
+7. Pokud kategorii nelze určit, použij „Neurčeno".{omezovaci_instrukce}
 
 ## Aliasy
 {aliasy_text}
@@ -300,7 +315,8 @@ Tyto protiúčty patří vlastním účtům firmy – transakce na ně jsou inte
 ## Transakce k zategorizování
 {chr(10).join(radky)}
 
-Vrať záznam pro každou transakci (celkem {len(transakce)} záznamů), ve stejném pořadí."""
+Vrať záznam pro každou transakci (celkem {len(k_ai)} záznamů), ve stejném pořadí.
+Použij ID transakce přesně tak, jak je uvedeno v prvním sloupci."""
 
     response = client.models.generate_content(
         model=MODEL,
@@ -316,12 +332,14 @@ Vrať záznam pro každou transakci (celkem {len(transakce)} záznamů), ve stej
             finish = response.candidates[0].finish_reason
         raise ValueError(
             f"Gemini vrátil prázdnou odpověď (finish_reason={finish}). "
-            f"Pravděpodobně příliš velký kontext ({len(transakce)} transakcí)."
+            f"Pravděpodobně příliš velký kontext ({len(k_ai)} transakcí)."
         )
     vysledky = response.parsed.transakce
 
+    k_ai_mnozina = set(k_ai)
     for v in vysledky:
-        if not (0 <= v.id < len(transakce)):
+        # Chybné ID mimo rozsah nebo na deterministicky zkategorizovaný řádek ignoruj
+        if v.id not in k_ai_mnozina:
             continue
         kategorie, poznamka = v.kategorie, v.poznamka
         if omezene_kategorie and kategorie not in omezene_kategorie:
@@ -334,6 +352,10 @@ Vrať záznam pro každou transakci (celkem {len(transakce)} záznamů), ve stej
         transakce[v.id]["Poznamka"] = poznamka
         transakce[v.id]["Jistota"] = v.jistota
 
+    return _doplneno(transakce)
+
+
+def _doplneno(transakce: list[dict]) -> list[dict]:
     for t in transakce:
         t.pop("_predparovano", None)
         # Každý řádek musí mít všechny výstupní sloupce (DictWriter v uloz_csv)
@@ -342,5 +364,4 @@ Vrať záznam pro každou transakci (celkem {len(transakce)} záznamů), ve stej
         t.setdefault("Poznamka", "")
         t.setdefault("Jistota", "")
         t.setdefault("Parovani", "")
-
     return transakce

@@ -19,6 +19,7 @@ dependencies = [
 kategorizace = "kategorizace:main"
 konfigurace = "kategorizace.konfigurace:main"
 report = "kategorizace.report:main"
+evaluace = "kategorizace.evaluace:main"
 
 [build-system]
 requires = ["setuptools"]

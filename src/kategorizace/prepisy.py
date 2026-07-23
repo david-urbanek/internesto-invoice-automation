@@ -48,9 +48,11 @@ from .config import (
     FIREMNI_UCTY,
     JIDLO_PODLE_PROVEDL,
     KATEGORIE,
+    KATEGORIE_PREPIS_PODLE_PROVEDL,
     KATEGORIE_PRIJMY_A_MAJITEL,
     KLICOVA_SLOVA_KOTLARSKA_RD_PRIJMOVY,
     OMEZENE_KATEGORIE_PODLE_UCTU,
+    POKLADNA_JMENA_KATEGORIE,
     UCET_NESTY_OSTATNI,
     UCET_RD_PRIJMOVY,
     UCET_TMOBILE,
@@ -195,7 +197,8 @@ def aplikuj_jidlo_podle_provedl(
         return transakce
 
     for t in transakce:
-        if t.get("Kategorie") != "Jídlo":
+        puvodni_kategorie = t.get("Kategorie")
+        if puvodni_kategorie not in KATEGORIE_PREPIS_PODLE_PROVEDL:
             continue
         provedl = (t.get("Provedl") or "").lower()
         for jmeno, nova_kategorie in JIDLO_PODLE_PROVEDL.items():
@@ -203,8 +206,8 @@ def aplikuj_jidlo_podle_provedl(
                 puvodni_poznamka = t.get("Poznamka", "")
                 t["Kategorie"] = nova_kategorie
                 t["Poznamka"] = (
-                    f"{puvodni_poznamka} Přepsáno z 'Jídlo' na '{nova_kategorie}' "
-                    f"podle karty ({t.get('Provedl', '')})."
+                    f"{puvodni_poznamka} Přepsáno z '{puvodni_kategorie}' na "
+                    f"'{nova_kategorie}' podle karty ({t.get('Provedl', '')})."
                 ).strip()
                 break
 
@@ -231,6 +234,57 @@ def aplikuj_pradlo_pokladna(transakce: list[dict], firma_nazev: str) -> list[dic
         t["Poznamka"] = (
             f"{puvodni_poznamka} Přepsáno z '{puvodni_kategorie}' na 'Recepční' – "
             f"na Pokladně popisek 'prádlo' je odměna recepční, ne externí prádelna."
+        ).strip()
+
+    return transakce
+
+
+def aplikuj_jmena_pokladna(transakce: list[dict], firma_nazev: str) -> list[dict]:
+    """
+    Na Pokladně popisek se jménem z POKLADNA_JMENA_KATEGORIE (celé slovo,
+    bez diakritiky) je hotovostní výplata/odměna dané osoby → její kategorie
+    (Petr → Recepční, Vendula/Iva → Úklid). Ověřeno na schválené historii.
+    """
+    if firma_nazev != "Pokladna":
+        return transakce
+
+    for t in transakce:
+        text = _bez_diakritiky(_text_transakce(t))
+        slova = set(re.findall(r"[a-z]+", text))
+        for jmeno, nova_kategorie in POKLADNA_JMENA_KATEGORIE.items():
+            if jmeno not in slova or t.get("Kategorie") == nova_kategorie:
+                continue
+            puvodni_poznamka = t.get("Poznamka", "")
+            puvodni_kategorie = t.get("Kategorie")
+            t["Kategorie"] = nova_kategorie
+            t["Poznamka"] = (
+                f"{puvodni_poznamka} Přepsáno z '{puvodni_kategorie}' na '{nova_kategorie}' – "
+                f"hotovostní výplata/odměna ({jmeno.capitalize()}) na Pokladně."
+            ).strip()
+            break
+
+    return transakce
+
+
+def aplikuj_jidlo_pokladna(transakce: list[dict], firma_nazev: str) -> list[dict]:
+    """
+    Na Pokladně hotovostní nákupy pečiva/snídaní ("Ostatní - pečivo, snídaně")
+    patří do "Jídlo", ne "Snídaně" – rozhodnutí uživatele 07/2026. Kategorie
+    "Snídaně" je pro fakturované snídaně, ne drobné hotovostní nákupy.
+    """
+    if firma_nazev != "Pokladna":
+        return transakce
+
+    for t in transakce:
+        text = _bez_diakritiky(_text_transakce(t))
+        if ("pecivo" not in text and "snidan" not in text) or t.get("Kategorie") == "Jídlo":
+            continue
+        puvodni_poznamka = t.get("Poznamka", "")
+        puvodni_kategorie = t.get("Kategorie")
+        t["Kategorie"] = "Jídlo"
+        t["Poznamka"] = (
+            f"{puvodni_poznamka} Přepsáno z '{puvodni_kategorie}' na 'Jídlo' – "
+            f"hotovostní nákup pečiva/snídaně na Pokladně je Jídlo."
         ).strip()
 
     return transakce

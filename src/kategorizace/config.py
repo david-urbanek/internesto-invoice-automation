@@ -130,12 +130,8 @@ KATEGORIE = [
         "dodavatele": ["Google", "Google CLOUD"],
         "protiucty": ["2500900397"],
     },
-    {
-        "nazev": "Multisport",
-        "popis": "Karty Multisport pro zaměstnance.",
-        "dodavatele": ["Multisport"],
-        "protiucty": ["2104561127"],
-    },
+    # POZN.: kategorie "Multisport" sloučena do "Ostatní služby" (07/2026)
+    # – dodavatel i protiúčet 2104561127 tam už byly, viz ALIASY.
     {
         "nazev": "Ostatní služby",
         "popis": "Různé služby nezařaditelné jinam (callcentrum, pošta, drobné poplatky).",
@@ -164,6 +160,22 @@ KATEGORIE = [
         "dodavatele": ["Papír"],
         "klicova_slova": ["Kancelář", "tisk", "Papir"],
     },
+    {
+        "nazev": "Poplatek",
+        "popis": "Pokuty a drobné poplatky (radary, ATM poplatky, správní pokuty). "
+                 "POZOR: 'Poplatek z ubytovací kapacity' patří do Rezervní 1.",
+        "dodavatele": [],
+        "protiucty": [],
+        "klicova_slova": ["Pokuta", "RADARY"],
+    },
+    {
+        "nazev": "Banka",
+        "popis": "Hotovostní operace s bankou z pokladny (odvod/vklad hotovosti do banky, "
+                 "typicky Radek). Štítek 'Banka' nebo 'Radek - banka'.",
+        "dodavatele": [],
+        "protiucty": [],
+        "klicova_slova": ["Radek - banka"],
+    },
 
     # =======================================================================
     # MZDY A LIDÉ (dle přehledu mezd)
@@ -178,7 +190,13 @@ KATEGORIE = [
                        "Marosova", "Dobos", "Soudni exekutor", "Urad prace",
                        "Drackova Michaela", "Hyzova Natalia", "Melichova Emma"],
         "protiucty": ["354003954", "6015-229761", "115-1648560267", "3055051183",
-                      "3799998003", "129886578"],
+                      "3799998003", "129886578",
+                      # doplněno z analýzy schválených výpisů leden–květen 2026
+                      # (100% konzistentní, 3+ výskyty)
+                      "2900681939", "2535398069", "4121512043", "330641230",
+                      "254203430", "86-138790287", "1186374047", "1024086325",
+                      "2800959278",
+                      "1289314063"],  # Zelená Iva (od 05/2026)
     },
     {
         "nazev": "Recepční",
@@ -208,10 +226,11 @@ KATEGORIE = [
     # =======================================================================
     {
         "nazev": "FU",
-        "popis": "Platby finančnímu úřadu (daně ze závislé činnosti). Dle přehledu mezd.",
+        "popis": "Platby finančnímu úřadu (daně ze závislé činnosti, daň z nemovitosti). "
+                 "Dle přehledu mezd.",
         "dodavatele": [],
-        "protiucty": ["7720-77628621", "713-77628621"],
-        "klicova_slova": ["FU"],
+        "protiucty": ["7720-77628621", "713-77628621", "7755-77628621"],
+        "klicova_slova": ["FU", "Dan z nemovitosti"],
     },
     {
         "nazev": "Socka",
@@ -229,7 +248,9 @@ KATEGORIE = [
         "nazev": "DPH",
         "popis": "Platba DPH finančnímu úřadu (RD i Nesty). Bez dokladu.",
         "dodavatele": [],
-        "protiucty": ["705-77628621", "2203097403"],
+        # 2203097403 odstraněn – platby na Premier Fond jsou VŽDY "Premier"
+        # (rozhodnutí uživatele 07/2026, viz UCET_VZDY_KATEGORIE)
+        "protiucty": ["705-77628621"],
         "klicova_slova": ["DPH"],
     },
 
@@ -304,7 +325,10 @@ KATEGORIE = [
     # =======================================================================
     {
         "nazev": "Splátka",
-        "popis": "Splátky úvěrů a úroků (MONETA, Casa Libre). Fixně dle smlouvy.",
+        "popis": ("Splátky úvěrů a úroků (MONETA, Casa Libre). Fixně dle smlouvy. "
+                  "POZOR: na úvěrové účty chodí i doplňování prostředků a interní "
+                  "obraty – Splátka je JEN fixní měsíční částka (SPLATKY_UVERU), "
+                  "jiné částky jsou 'Převod' – řeší deterministika.py."),
         "dodavatele": [],
         "protiucty": ["249102969", "249103128", "249099667"],
         "klicova_slova": ["splátku", "úvěr"],
@@ -367,33 +391,39 @@ KATEGORIE = [
         "protiucty": ["10014-1703621", "2110568392"],
         "klicova_slova": ["energie", "plyn", "V14", "nedoplatek"],
     },
+    # POZN.: Prostory a Snídaně dřív deklarovaly protiúčet 2301240402 (Nesty
+    # Příjmový). Dle rozhodnutí uživatele (07/2026) platby na interní účet
+    # patří do "Převod" – protiúčet odstraněn, aby je aplikuj_interni_prevod
+    # přepsal; kategorie zůstávají pro případy rozpoznané štítkem/klíč. slovem.
     {
         "nazev": "Prostory",
         "popis": "Nájem prostor sloužících podnikání (Nesty – X.01, E03, E09). Dle smlouvy.",
         "dodavatele": [],
-        "protiucty": ["2301240402"],
+        "protiucty": [],
         "klicova_slova": ["prostor", "Prostory"],
     },
     {
         "nazev": "Snídaně",
         "popis": "Náklady na snídaně pro hosty. Dle FA.",
         "dodavatele": [],
-        "protiucty": ["2301240402"],
+        "protiucty": [],
         "klicova_slova": ["Snidane", "snídan"],
     },
     {
         "nazev": "A43",
-        "popis": "Energie/nájem jednotky – Cejl 79 (o.m. 361020403), č. 143, inkaso úvěru jednotky. Trvalý příkaz.",
+        "popis": "Energie/nájem jednotky – Cejl 79 (o.m. 361020403), č. 143, inkaso úvěru "
+                 "jednotky (smlouva 1694/25/021). Trvalý příkaz.",
         "dodavatele": [],
         "protiucty": ["6102102232", "3342292", "2702901101"],
-        "klicova_slova": ["361020403", "č. 143"],
+        "klicova_slova": ["361020403", "č. 143", "1694/25/021"],
     },
     {
         "nazev": "B53",
-        "popis": "Energie/nájem jednotky – Cejl 79 (o.m. 361010303), č. 253 a 71, inkaso úvěru jednotky. Trvalý příkaz.",
+        "popis": "Energie/nájem jednotky – Cejl 79 (o.m. 361010303), č. 253 a 71, inkaso úvěru "
+                 "jednotky (smlouva 3699/24/021). Trvalý příkaz.",
         "dodavatele": [],
         "protiucty": ["2702901101", "6430097786", "3342292"],
-        "klicova_slova": ["361010303", "č. 253", "č. 71"],
+        "klicova_slova": ["361010303", "č. 253", "č. 71", "3699/24/021"],
     },
     {
         "nazev": "A63",
@@ -472,25 +502,23 @@ KATEGORIE = [
                   "a půjčky/splátky společníka. Není to skutečný výdaj – jen přesun peněz. "
                   "Označit, ALE NEzahrnovat do výdajových součtů."),
         "dodavatele": [],
-        "protiucty": ["2200973033", "2901813198", "2301240402", "2201422348",
-                      "2901321222", "1177419020", "5845640002"],
-        "klicova_slova": ["Převod na Výdajový", "Odklad", "Výběr z bankomatu",
+        # Dřívější samostatné kategorie "Převod Výdajový 1/2" sloučeny sem
+        # (rozhodnutí uživatele 07/2026) – viz ALIASY.
+        "protiucty": ["2200973033", "2901813198", "2601728813", "2301240402",
+                      "2201422348", "2901321222", "1177419020", "5845640002",
+                      # doplněno z analýzy schválených výpisů leden–květen 2026
+                      "2107482336", "064450-6005980009"],
+        "klicova_slova": ["Převod na Výdajový", "Převod na výdajový",
+                          "První část na Výdajový", "Odklad", "Výběr z bankomatu",
                           "Vklad do bankomatu", "Půjčka společníka", "Splátka společníka",
                           "Mylná platba"],
     },
     {
-        "nazev": "Převod Výdajový 1",
-        "popis": "Převod na účet Výdajový 1 (2901813198). Přesun peněz, ne výdaj.",
+        "nazev": "Premier",
+        "popis": "Převod na účet Premier Fond (2203097403). Interní tok – přesun peněz, ne výdaj.",
         "dodavatele": [],
-        "protiucty": ["2901813198"],
-        "klicova_slova": ["Převod na Výdajový 1", "První část na Výdajový"],
-    },
-    {
-        "nazev": "Převod Výdajový 2",
-        "popis": "Převod na účet Výdajový 2 (2601728813). Přesun peněz, ne výdaj.",
-        "dodavatele": [],
-        "protiucty": ["2601728813"],
-        "klicova_slova": ["Převod na Výdajový 2", "Převod na výdajový"],
+        "protiucty": ["2203097403"],
+        "klicova_slova": ["Premier"],
     },
     {
         "nazev": "Rezervní 1",
@@ -527,16 +555,28 @@ KATEGORIE_BEZ_FAKTURY: set[str] = {
     # Splátky úvěrů
     "Splátka", "Úrok",
     # Interní převody a rezervy
-    "Převod", "Převod Výdajový 1", "Převod Výdajový 2",
+    "Převod", "Premier",
     "Rezervní 1", "Rezervní 2", "Rezervní 3",
     # Hosté a příjmy
     "Kauce", "Vratka", "Airbnb", "Příjem energie",
     # Osobní výdaje majitele (nepatří do firemních výdajů)
     "Výdaje majitele", "Benzín",
+    # Pokuty, poplatky a hotovostní operace pokladny
+    "Poplatek", "Banka",
 }
 
 ALIASY: dict[str, str] = {
     "Spotify a Netflix": "Netflix a Spotify",
+    "Netflix": "Netflix a Spotify", "Spotify": "Netflix a Spotify",
+    # sloučení dřívějších podkategorií převodů (07/2026)
+    "Převod Výdajový 1": "Převod", "Převod Výdajový 2": "Převod",
+    "Převod na Výdajový 1": "Převod", "Převod na Výdajový 2": "Převod",
+    "Převod na Výdajový 2 (Druhá část)": "Převod",
+    "Převod na výdajový 2 (První část)": "Převod",
+    "První část na Výdajový 1": "Převod",
+    "Kooperativa, pojistovna, a.s.": "Pojištění",
+    "Pojištění Taigo": "Pojištění",
+    "Bidfood": "Jídlo",
     "Chrištof": "Prádelna",
     "Uklid": "Úklid",
     "Telefon": "Telefony",
@@ -560,15 +600,19 @@ ALIASY: dict[str, str] = {
     "Dekorace 2": "Dekorace",
     "C79 únor": "Spilberk", "C79 březen": "Spilberk", "C79": "Spilberk",
     "Účetní únor": "Rosi", "Účetní březen": "Rosi",
-    "převod": "Převod", "Výdajový 2": "Převod Výdajový 2", "RD Ostatní": "Převod",
+    "převod": "Převod", "Výdajový 2": "Převod", "RD Ostatní": "Převod",
     "DPH Nesty": "DPH", "DPH do plusu": "DPH",
     "vratka": "Vratka", "Vratka peněz": "Vratka",
     "Airbank": "Airbnb",
     "Přeplatek energie": "Příjem energie",
     "Ostatní": "Ostatní služby",
+    "Multisport": "Ostatní služby",
     "Alza": "Dekorace",
     "Benzín převod?": "Benzín",
     "Pokuta": "Poplatek",
+    # vratka omylem poslané platby je vždy interní přesun, i když protiúčet
+    # patří konkrétní kategorii (Spilberk apod.)
+    "Mylná platba": "Převod",
 }
 
 KATEGORIE_PRIJMY_A_MAJITEL = [
@@ -582,8 +626,10 @@ KATEGORIE_PRIJMY_A_MAJITEL = [
     },
     {
         "nazev": "Výdaje majitele",
-        "popis": "Osobní nákupy majitele (Rohlik, Lidl, DR.MAX, pronájem bytu Fibingr). "
-                 "Nepatří do firemních výdajů.",
+        "popis": "Osobní nákupy majitele – potraviny, drogerie, lékárna, hobbymarkety "
+                 "(OBI, zahradnictví), e-shopy, pronájem bytu Fibingr. Nepatří do "
+                 "firemních výdajů. Na účtu RD Ostatní (2901321222) sem patří KAŽDÝ "
+                 "karetní nákup u obchodníka, který není tankování (Benzín).",
         "dodavatele": ["Lidl", "Rohlik.cz", "DR. MAX", "Fairhotel"],
         "protiucty": ["670100-2200894925"],
         "klicova_slova": [],
@@ -614,8 +660,15 @@ KATEGORIE_PRIJMY_A_MAJITEL = [
 #
 UCET_NESTY_OSTATNI = "2301780716"
 
+# Kategorie, u kterých se na účtu Nesty Ostatní přepisuje podle karty.
+# Ověřeno na schválené historii: karetní nákupy Danče v těchto kategoriích
+# jsou VŽDY osobní útrata. Benzín a Reprezentace se NEpřepisují – tam má
+# Danč i legitimní firemní/vlastní kategorie (tankování, pohoštění).
+KATEGORIE_PREPIS_PODLE_PROVEDL: set[str] = {"Jídlo", "Drogerie", "Snídaně"}
+
 # Podřetězec ve sloupci "Provedl" (hledá se case-insensitive) → nová kategorie.
-# Aplikuje se JEN pokud AI transakci nejdřív zařadila do kategorie "Jídlo".
+# Aplikuje se JEN pokud AI transakci nejdřív zařadila do některé z kategorií
+# KATEGORIE_PREPIS_PODLE_PROVEDL.
 JIDLO_PODLE_PROVEDL: dict[str, str] = {
     "danč": "Výdaje majitele",
     "danc": "Výdaje majitele",
@@ -643,7 +696,9 @@ JIDLO_PODLE_PROVEDL: dict[str, str] = {
 #   "vyloucene"  – VYLUČOVACÍ seznam, AI smí vybrat cokoliv KROMĚ těchto
 OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
     "2901321222": {  # RD Group s.r.o. | Ostatní CZK (Fio)
-        "klicove_slovo": "ostatni",
+        # POZOR: klíčové slovo musí obsahovat i firmu – samotné "ostatni" by
+        # chytalo i "Nesty Ostatní", který uzavřený seznam mít nesmí.
+        "klicove_slovo": "rd ostatni",
         "kategorie": ["Benzín", "Výdaje majitele", "Převod"],
     },
     "POKLADNA_HOTOVOST": {  # hotovostní pokladna – bez čísla účtu
@@ -677,6 +732,66 @@ KLICOVA_SLOVA_KOTLARSKA_RD_PRIJMOVY: list[str] = ["pronajem bytu"]
 UCET_TMOBILE = "19-2235210247"
 
 # ---------------------------------------------------------------------------
+# Hotovostní výplaty na Pokladně podle jména (aplikuj_jmena_pokladna)
+# ---------------------------------------------------------------------------
+# Jméno v popisu hotovostní transakce → kategorie (mzda/odměna v hotovosti).
+# Ověřeno na schválených výpisech: Petr 7/7 Recepční, Vendula/Iva Úklid.
+# Hledá se jako celé slovo (case-insensitive, bez diakritiky), jen na Pokladně.
+POKLADNA_JMENA_KATEGORIE: dict[str, str] = {
+    "vendula": "Úklid",
+    "venda": "Úklid",
+    "vendy": "Úklid",   # skloňovaný tvar ("Výplata Vendy M.")
+    "iva": "Úklid",
+    "petr": "Recepční",
+}
+
+# ---------------------------------------------------------------------------
+# Protiúčty s pevnou kategorií bez ohledu na štítek a částku
+# ---------------------------------------------------------------------------
+# Nejsilnější deterministické pravidlo (deterministika.py) – přebíjí i
+# uživatelský štítek. Rozhodnutí uživatele 07/2026: platby na Premier Fond
+# jsou VŽDY "Premier" a platby na rezervní účty VŽDY příslušná "Rezervní N",
+# i když štítek říká jen "Převod"/"Doplatek".
+UCET_VZDY_KATEGORIE: dict[str, str] = {
+    "2203097403": "Premier",
+    "2402351507": "Rezervní 1",
+    "2102351505": "Rezervní 2",
+    "2602411244": "Rezervní 3",
+}
+
+# ---------------------------------------------------------------------------
+# Textové markery s pevnou kategorií (deterministika.py)
+# ---------------------------------------------------------------------------
+# Jednoznačné identifikátory v textu transakce (štítek/zpráva/protistrana,
+# hledá se case-insensitive) – čísla odběrných míst, čísla úvěrových smluv,
+# technické platby. Ověřeno na schválených výpisech leden–květen 2026.
+VZDY_TEXT_KATEGORIE: dict[str, str] = {
+    "361020403": "A43",     # odběrné místo Cejl 79
+    "1694/25/021": "A43",   # úvěrová smlouva jednotky
+    "361010303": "B53",     # odběrné místo Cejl 79
+    "3699/24/021": "B53",   # úvěrová smlouva jednotky
+    "comgate": "Převod",    # identifikační platby ±1 Kč a jejich vratky
+    "dobr0": "Vratka",      # čísla dobropisů z pokladny ("Platba dokladu č. 2026DOBR0471")
+}
+
+# ---------------------------------------------------------------------------
+# Fixní měsíční splátky úvěrů podle úvěrového účtu (MONETA)
+# ---------------------------------------------------------------------------
+# Ověřeno na schválených výpisech leden–květen 2026: na úvěrové účty chodí
+# kromě splátky i doplňování prostředků (−25k/−30k) a interní obraty (±40k),
+# které patří do "Převod". Skutečná splátka je jen fixní částka dle smlouvy.
+# Deterministické pravidlo (deterministika.py):
+#   |částka| = některá z fixních splátek  → "Splátka"
+#   jiná částka, ale text obsahuje "splátk" → nechat na AI (možná refixace
+#     úroku – po změně výše splátky aktualizuj tento slovník)
+#   jiná částka                            → "Převod"
+SPLATKY_UVERU: dict[str, list[float]] = {
+    "249102969": [6605.76, 7515.33],  # RD Group – splátka a úrok / splátka a úvěr
+    "249103128": [6605.76],           # Casa Libre
+    "249099667": [6290.42],           # Nesty Services
+}
+
+# ---------------------------------------------------------------------------
 # Dodavatelé s pevnou kategorií bez ohledu na znaménko částky
 # ---------------------------------------------------------------------------
 # Podřetězec v textu transakce (protistrana/poznámka/zpráva, hledá se
@@ -686,6 +801,9 @@ VZDY_DODAVATEL_KATEGORIE: dict[str, str] = {
     "alza": "Dekorace",
     "silmet": "Benzín",
     "zerogas": "Benzín",
+    # Nestlé automat "Mezi vodami" – doplňky do apartmánů, ne jídlo
+    # (schválená historie: 7/7 Dekorace)
+    "nestle": "Dekorace",
 }
 
 # ---------------------------------------------------------------------------

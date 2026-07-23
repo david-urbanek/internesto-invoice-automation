@@ -22,11 +22,14 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn
 
 from .ai import kategorizuj_transakce
 from .config import FIRMY_SLOZKA
+from .deterministika import aplikuj_deterministickou_kategorizaci
 from .faktura_index import filtruj_faktury, postav_index, rozsah_dat
 from .io import najdi_faktury, nacti_csv, uloz_csv
 from .prepisy import (
     aplikuj_interni_prevod,
     aplikuj_jidlo_podle_provedl,
+    aplikuj_jidlo_pokladna,
+    aplikuj_jmena_pokladna,
     aplikuj_kotlarska_pronajem_bytu,
     aplikuj_pradlo_pokladna,
     aplikuj_prevod_zpetna_platba,
@@ -97,6 +100,8 @@ def zpracuj_job(
             progress.update(task_id, completed=1, description=f"[yellow]⚠ {job['label']}[/yellow]  Prázdný CSV soubor")
             return
         omezene_kategorie = omezene_kategorie_pro_soubor(job["csv"])
+        # Jednoznačné transakce (štítek/protiúčet) zkategorizuj bez AI
+        transakce = aplikuj_deterministickou_kategorizaci(transakce, omezene_kategorie)
         transakce = kategorizuj_transakce(
             transakce, faktury, client, firma_index=firma_index, omezene_kategorie=omezene_kategorie,
         )
@@ -104,6 +109,8 @@ def zpracuj_job(
         transakce = aplikuj_kotlarska_pronajem_bytu(transakce, job["csv"], firma_nazev)
         transakce = aplikuj_jidlo_podle_provedl(transakce, job["csv"], firma_nazev)
         transakce = aplikuj_pradlo_pokladna(transakce, firma_nazev)
+        transakce = aplikuj_jmena_pokladna(transakce, firma_nazev)
+        transakce = aplikuj_jidlo_pokladna(transakce, firma_nazev)
         transakce = aplikuj_prevod_zpetna_platba(transakce)
         transakce = aplikuj_telefony_nejvyssi_castka(transakce)
         transakce = aplikuj_vzdy_dodavatel(transakce, omezene_kategorie=omezene_kategorie)
