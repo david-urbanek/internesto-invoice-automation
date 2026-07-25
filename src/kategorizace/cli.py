@@ -20,23 +20,9 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
-from .ai import kategorizuj_transakce
 from .config import FIRMY_SLOZKA
-from .deterministika import aplikuj_deterministickou_kategorizaci
-from .faktura_index import filtruj_faktury, postav_index, rozsah_dat
-from .io import najdi_faktury, nacti_csv, uloz_csv
-from .prepisy import (
-    aplikuj_interni_prevod,
-    aplikuj_jidlo_podle_provedl,
-    aplikuj_jidlo_pokladna,
-    aplikuj_jmena_pokladna,
-    aplikuj_kotlarska_pronajem_bytu,
-    aplikuj_pradlo_pokladna,
-    aplikuj_prevod_zpetna_platba,
-    aplikuj_telefony_nejvyssi_castka,
-    aplikuj_vzdy_dodavatel,
-    omezene_kategorie_pro_soubor,
-)
+from .faktura_index import postav_index
+from .pipeline import zpracuj_job_core
 
 load_dotenv()
 
@@ -80,46 +66,17 @@ def zpracuj_job(
 ) -> None:
     task_id = progress.add_task(f"[cyan]{job['label']}[/cyan]  Načítám...", total=1)
     try:
-        transakce = nacti_csv(job["csv"])
-
-        # Filtruj faktury podle datového rozsahu transakcí
-        rozsah = rozsah_dat(transakce)
-        if rozsah and firma_index:
-            datum_od, datum_do = rozsah
-            faktury = filtruj_faktury(firma_index, invoices_slozka, datum_od, datum_do)
-        elif os.path.isdir(invoices_slozka):
-            faktury = najdi_faktury(invoices_slozka)
-        else:
-            faktury = []
-
-        progress.update(
-            task_id,
-            description=f"[cyan]{job['label']}[/cyan]  Odesílám {len(transakce)} transakcí + {len(faktury)} faktur...",
+        vysledek = zpracuj_job_core(
+            job, invoices_slozka, firma_index, firma_nazev, client,
+            status=lambda msg: progress.update(task_id, description=f"[cyan]{job['label']}[/cyan]  {msg}"),
         )
-        if not transakce:
+        if vysledek["prazdny"]:
             progress.update(task_id, completed=1, description=f"[yellow]⚠ {job['label']}[/yellow]  Prázdný CSV soubor")
             return
-        omezene_kategorie = omezene_kategorie_pro_soubor(job["csv"])
-        # Jednoznačné transakce (štítek/protiúčet) zkategorizuj bez AI
-        transakce = aplikuj_deterministickou_kategorizaci(transakce, omezene_kategorie)
-        transakce = kategorizuj_transakce(
-            transakce, faktury, client, firma_index=firma_index, omezene_kategorie=omezene_kategorie,
-        )
-        transakce = aplikuj_interni_prevod(transakce)
-        transakce = aplikuj_kotlarska_pronajem_bytu(transakce, job["csv"], firma_nazev)
-        transakce = aplikuj_jidlo_podle_provedl(transakce, job["csv"], firma_nazev)
-        transakce = aplikuj_pradlo_pokladna(transakce, firma_nazev)
-        transakce = aplikuj_jmena_pokladna(transakce, firma_nazev)
-        transakce = aplikuj_jidlo_pokladna(transakce, firma_nazev)
-        transakce = aplikuj_prevod_zpetna_platba(transakce)
-        transakce = aplikuj_telefony_nejvyssi_castka(transakce)
-        transakce = aplikuj_vzdy_dodavatel(transakce, omezene_kategorie=omezene_kategorie)
-        os.makedirs(os.path.dirname(job["vystup"]), exist_ok=True)
-        uloz_csv(job["vystup"], transakce, list(transakce[0].keys()))
         progress.update(
             task_id,
             completed=1,
-            description=f"[green]✓ {job['label']}[/green]  Hotovo ({len(transakce)} transakcí, {len(faktury)} faktur)",
+            description=f"[green]✓ {job['label']}[/green]  Hotovo ({vysledek['transakce']} transakcí, {vysledek['faktury']} faktur)",
         )
     except ValidationError:
         progress.update(task_id, completed=1, description=f"[red]✗ {job['label']}[/red]  Gemini vrátil neočekávanou strukturu.")
