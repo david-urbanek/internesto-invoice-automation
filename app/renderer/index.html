@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'" />
+  <title>Kategorizace transakcí</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Kategorizace transakcí</h1>
+    <p class="subtitle">AI kategorizace bankovních výpisů a párování faktur</p>
+  </header>
+
+  <main>
+    <!-- Nastavení -->
+    <section class="card" id="nastaveni">
+      <h2>Nastavení</h2>
+      <div class="field">
+        <label for="api-key">Gemini API klíč</label>
+        <div class="row">
+          <input type="password" id="api-key" placeholder="Vlož API klíč…" autocomplete="off" />
+          <button id="btn-uloz-klic" class="secondary">Uložit</button>
+        </div>
+        <p class="hint" id="klic-stav"></p>
+      </div>
+      <div class="field">
+        <label>Složka s daty</label>
+        <div class="row">
+          <button id="btn-vyber-slozku" class="secondary">Vybrat složku…</button>
+          <span id="slozka-cesta" class="path">Nevybráno</span>
+        </div>
+        <p class="hint">Složka musí obsahovat podadresář <code>firmy</code> (v něm každá firma se složkami <code>transactions</code> a <code>invoices</code>).</p>
+      </div>
+      <div class="field" id="nahled-wrap" hidden>
+        <label>Nalezené výpisy</label>
+        <ul id="nahled"></ul>
+      </div>
+    </section>
+
+    <!-- Běh -->
+    <section class="card" id="beh">
+      <div class="row spread">
+        <h2>Zpracování</h2>
+        <div class="row">
+          <button id="btn-spustit">▶ Spustit kategorizaci</button>
+          <button id="btn-zastavit" class="danger" hidden>■ Zastavit</button>
+        </div>
+      </div>
+
+      <div id="progress-wrap" hidden>
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+        <p id="progress-text"></p>
+      </div>
+
+      <ul id="joby"></ul>
+
+      <details id="log-wrap" hidden>
+        <summary>Podrobný log</summary>
+        <pre id="log"></pre>
+      </details>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

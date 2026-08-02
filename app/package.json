@@ -1,0 +1,49 @@
+{
+  "name": "kategorizace-app",
+  "productName": "Kategorizace transakcí",
+  "version": "0.1.0",
+  "description": "Desktopová aplikace pro AI kategorizaci bankovních transakcí",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.internesto.kategorizace",
+    "productName": "Kategorizace",
+    "afterPack": "afterPack.js",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../engine/dist/",
+        "to": "engine/"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "category": "public.app-category.finance",
+      "extendInfo": {
+        "CFBundleDisplayName": "Kategorizace transakcí"
+      }
+    },
+    "dmg": {
+      "title": "Kategorizace transakcí"
+    },
+    "win": {
+      "target": ["nsis"]
+    }
+  }
+}
