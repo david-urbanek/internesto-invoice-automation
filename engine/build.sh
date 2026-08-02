@@ -8,8 +8,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# PyInstaller nainstaluj do venv, pokud chybí
-.venv/bin/python -m pip show pyinstaller >/dev/null 2>&1 || .venv/bin/python -m pip install pyinstaller
+# PyInstaller nainstaluj do venv, pokud chybí (venv je spravovaný uv, pip v něm není)
+.venv/bin/python -c "import PyInstaller" >/dev/null 2>&1 || uv pip install pyinstaller
 
 .venv/bin/python -m PyInstaller \
   --onefile \

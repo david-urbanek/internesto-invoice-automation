@@ -42,8 +42,25 @@ cd app
 npm run dist       # výstup v app/dist/
 ```
 
+Výstup: `app/dist/Kategorizace.app` (dvojklikem spustitelná) a `.dmg`.
+Rychlejší build jen pro vlastní architekturu: `npx electron-builder --mac dmg --arm64`.
+
 Pozn.: PyInstaller nedělá cross-compile – macOS binárku sestavíš na Macu
 (arm64/x64 zvlášť), Windows `.exe` na Windows.
+
+### Dvě macOS specialitky, na které nešahat
+
+1. **`build.productName` musí být bez diakritiky** (`Kategorizace`). macOS ukládá
+   názvy složek v Unicode NFD, ale `Info.plist` v NFC – s „í“ v názvu pak Chromium
+   nenajde helper aplikace (`… Helper (GPU).app`) a aplikace spadne hned po startu
+   na `SIGTRAP`, bez jediné hlášky. Český název se uživateli zobrazuje přes
+   `CFBundleDisplayName` v `mac.extendInfo`.
+
+2. **Ad-hoc podpis přes `afterPack.js`.** Bez Developer ID certifikátu
+   electron-builder podpis přeskočí, jenže na Apple Siliconu se nepodepsaný bundle
+   vůbec nespustí. `afterPack.js` podepíše bundle zevnitř ven (`codesign --deep`
+   u Electronu nefunguje). Pro cizí Macy to nenahrazuje notarizaci – Gatekeeper
+   si při prvním spuštění vyžádá pravý klik → Otevřít.
 
 ## Nastavení uživatele
 
