@@ -32,7 +32,7 @@ from .config import (
     ALIASY,
     FIREMNI_UCTY,
     KATEGORIE,
-    KATEGORIE_PRIJMY_A_MAJITEL,
+    KATEGORIE_PRIJMOVE,
     SPLATKY_UVERU,
     UCET_VZDY_KATEGORIE,
     VZDY_TEXT_KATEGORIE,
@@ -46,13 +46,13 @@ def _mapy_pravidel() -> tuple[dict[str, str], dict[str, str], set[str]]:
     množina všech deklarovaných protiúčtů).
     """
     podle_stitku: dict[str, str] = {}
-    for k in KATEGORIE + KATEGORIE_PRIJMY_A_MAJITEL:
+    for k in KATEGORIE + KATEGORIE_PRIJMOVE:
         podle_stitku[k["nazev"].strip().casefold()] = k["nazev"]
     for alias, kanonicky in ALIASY.items():
         podle_stitku.setdefault(alias.strip().casefold(), kanonicky)
 
     deklarace: dict[str, set[str]] = {}
-    for k in KATEGORIE + KATEGORIE_PRIJMY_A_MAJITEL:
+    for k in KATEGORIE + KATEGORIE_PRIJMOVE:
         for ucet in k.get("protiucty") or []:
             deklarace.setdefault(ucet.strip(), set()).add(k["nazev"])
     podle_uctu = {u: next(iter(kat)) for u, kat in deklarace.items() if len(kat) == 1}

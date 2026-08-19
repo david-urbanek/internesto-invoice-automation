@@ -49,8 +49,9 @@ from .config import (
     JIDLO_PODLE_PROVEDL,
     KATEGORIE,
     KATEGORIE_PREPIS_PODLE_PROVEDL,
-    KATEGORIE_PRIJMY_A_MAJITEL,
+    KATEGORIE_PRIJMOVE,
     KLICOVA_SLOVA_KOTLARSKA_RD_PRIJMOVY,
+    MAPOVANI_NA_FORMULAR,
     OMEZENE_KATEGORIE_PODLE_UCTU,
     POKLADNA_JMENA_KATEGORIE,
     UCET_NESTY_OSTATNI,
@@ -59,6 +60,8 @@ from .config import (
     VYJIMKY_VZDY_DODAVATEL,
     VZDY_DODAVATEL_KATEGORIE,
 )
+
+_KATEGORIE_PRIJMOVE_NAZVY = {k["nazev"] for k in KATEGORIE_PRIJMOVE}
 
 
 def aplikuj_interni_prevod(transakce: list[dict]) -> list[dict]:
@@ -72,7 +75,7 @@ def aplikuj_interni_prevod(transakce: list[dict]) -> list[dict]:
     jde o záměrně zvlášť sledovaný interní tok, ne o obyčejný přesun peněz.
     """
     povolene_kategorie: dict[str, set[str]] = {}
-    for k in KATEGORIE + KATEGORIE_PRIJMY_A_MAJITEL:
+    for k in KATEGORIE + KATEGORIE_PRIJMOVE:
         for ucet in k.get("protiucty") or []:
             povolene_kategorie.setdefault(ucet.strip(), set()).add(k["nazev"])
 
@@ -144,7 +147,7 @@ def omezene_kategorie_pro_soubor(nazev_souboru: str) -> list[str] | None:
         if "kategorie" in zaznam:
             return zaznam["kategorie"]
         vyloucene = set(zaznam.get("vyloucene", []))
-        vsechny_kategorie = [k["nazev"] for k in KATEGORIE + KATEGORIE_PRIJMY_A_MAJITEL]
+        vsechny_kategorie = [k["nazev"] for k in KATEGORIE + KATEGORIE_PRIJMOVE]
         return [n for n in vsechny_kategorie if n not in vyloucene]
     return None
 
@@ -428,4 +431,41 @@ def aplikuj_vzdy_dodavatel(
                     ).strip()
             break
 
+    return transakce
+
+
+def _radek_pro_kategorii(kategorie: str, objem: str | None, mena: str | None) -> str:
+    """
+    Namapuje kategorii na ID řádku Alokačního formuláře (config.MAPOVANI_NA_FORMULAR).
+
+    "P<n>" = příjmový řádek, "N<n>" = výdajový řádek. Kategorie, které nejsou
+    v MAPOVANI_NA_FORMULAR vůbec, nebo mají hodnotu None (vědomě bez řádku /
+    čeká na klienta – viz docs/otazky-pro-klienta.md), dostanou "P00"/"N00"
+    podle toho, zda kategorie patří mezi příjmové, nebo výdajové – peníze se
+    tak nikdy neztratí potichu, jen se objeví jako nenamapované.
+    """
+    prefix = "P" if kategorie in _KATEGORIE_PRIJMOVE_NAZVY else "N"
+    nenamapovano = f"{prefix}00"
+    cil = MAPOVANI_NA_FORMULAR.get(kategorie)
+    if cil is None:
+        return nenamapovano
+    if isinstance(cil, str):
+        return cil
+    if "+" in cil or "-" in cil:
+        castka = _parsuj_castku(objem) or 0.0
+        return cil.get("+" if castka >= 0 else "-", nenamapovano)
+    # currency-keyed dict, např. {"CZK": "P4", "EUR": "P6"}
+    return cil.get((mena or "CZK").strip().upper(), nenamapovano)
+
+
+def aplikuj_radek_formulare(transakce: list[dict], firma_nazev: str) -> list[dict]:
+    """
+    Doplní ke každé transakci sloupce "Firma" (název firmy dle složky) a
+    "Radek" (ID řádku Alokačního formuláře, viz _radek_pro_kategorii výš).
+    Musí běžet AŽ PO všech ostatních přepisech, protože se řídí finální
+    kategorií transakce.
+    """
+    for t in transakce:
+        t["Firma"] = firma_nazev
+        t["Radek"] = _radek_pro_kategorii(t.get("Kategorie", ""), t.get("Objem"), t.get("Měna"))
     return transakce

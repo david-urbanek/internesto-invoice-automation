@@ -21,7 +21,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
-from .config import ALIASY, FIREMNI_UCTY, KATEGORIE, KATEGORIE_PRIJMY_A_MAJITEL, MODEL
+from .config import ALIASY, FIREMNI_UCTY, KATEGORIE, KATEGORIE_PRIJMOVE, MODEL
 from .faktura_index import kandidati_pro_transakci, predparuj
 
 MIN_JISTOTA_PAROVANI = 50
@@ -262,7 +262,7 @@ def kategorizuj_transakce(
 
     omezovaci_instrukce = ""
     if omezene_kategorie:
-        vsechny_kategorie = {k["nazev"]: k for k in KATEGORIE + KATEGORIE_PRIJMY_A_MAJITEL}
+        vsechny_kategorie = {k["nazev"]: k for k in KATEGORIE + KATEGORIE_PRIJMOVE}
         kategorie_sekce = (
             "## Dostupné kategorie (uzavřený výběr pro tento výpis)\n"
             + "\n".join(
@@ -278,10 +278,10 @@ def kategorizuj_transakce(
     else:
         kategorie_sekce = (
             "## Dostupné kategorie\n"
-            "### Firemní výdaje a interní převody\n"
+            "### Výdajové kategorie\n"
             f"{chr(10).join(_formatuj_kategorii(k) for k in KATEGORIE)}\n\n"
-            "### Příjmy a osobní výdaje majitele\n"
-            f"{chr(10).join(_formatuj_kategorii(k) for k in KATEGORIE_PRIJMY_A_MAJITEL)}"
+            "### Příjmové kategorie\n"
+            f"{chr(10).join(_formatuj_kategorii(k) for k in KATEGORIE_PRIJMOVE)}"
         )
 
     prompt = f"""Jsi asistent pro kategorizaci účetních transakcí české firmy provozující apartmány.

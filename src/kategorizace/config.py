@@ -27,6 +27,7 @@ ALIASY_SLOUPCU_CSV: dict[str, str] = {
     "Popis": "Poznámka",
     "VS dokladu": "VS",
     "Uživatel": "Provedl",
+    "Měna účtu": "Měna",
 }
 
 # Všechny interní účty skupiny (Fio, MONETA, Raiffeisen, Air Bank).
@@ -248,7 +249,7 @@ KATEGORIE = [
         "nazev": "DPH",
         "popis": "Platba DPH finančnímu úřadu (RD i Nesty). Bez dokladu.",
         "dodavatele": [],
-        # 2203097403 odstraněn – platby na Premier Fond jsou VŽDY "Premier"
+        # 2203097403 odstraněn – platby na Premier Fond jsou VŽDY "Výdaj Premier"
         # (rozhodnutí uživatele 07/2026, viz UCET_VZDY_KATEGORIE)
         "protiucty": ["705-77628621"],
         "klicova_slova": ["DPH"],
@@ -258,7 +259,7 @@ KATEGORIE = [
     # PROVIZE A SYSTÉMY
     # =======================================================================
     {
-        "nazev": "Booking",
+        "nazev": "Výdaj Booking",
         "popis": "Provize Booking.com. Dle FA.",
         "dodavatele": ["Booking"],
         "protiucty": ["4030400003"],
@@ -514,18 +515,48 @@ KATEGORIE = [
                           "Mylná platba"],
     },
     {
-        "nazev": "Premier",
+        "nazev": "Výdaj Premier",
         "popis": "Převod na účet Premier Fond (2203097403). Interní tok – přesun peněz, ne výdaj.",
         "dodavatele": [],
         "protiucty": ["2203097403"],
         "klicova_slova": ["Premier"],
     },
     {
-        "nazev": "Rezervní 1",
-        "popis": "Rezervní účet (2402351507) – ubytovací/místní poplatky, popelnice (FCC), parkování.",
+        "nazev": "Parkování",
+        "popis": "Rezervní účet (2402351507) – úhrady za parkování. Rozlišeno textem "
+                 "'parkování' v transakci (protiúčet je sdílený s Popelnice/Ubytovací "
+                 "poplatky/Rezervní 1).",
+        "dodavatele": [],
+        "protiucty": ["2402351507"],
+        "klicova_slova": ["parkování", "parkovani"],
+    },
+    {
+        "nazev": "Popelnice",
+        "popis": "Rezervní účet (2402351507) – poplatky za svoz odpadu (FCC). Rozlišeno "
+                 "dodavatelem FCC a textem 'popelnice' (protiúčet je sdílený s "
+                 "Parkování/Ubytovací poplatky/Rezervní 1).",
         "dodavatele": ["FCC"],
-        "protiucty": ["2402351507", "43-8206670217", "115-9579990277"],
-        "klicova_slova": ["Poplatek z ubytovací kapacity", "Ubytovaci poplatky", "Popelnice"],
+        "protiucty": ["2402351507"],
+        "klicova_slova": ["popelnice"],
+    },
+    {
+        "nazev": "Ubytovací poplatky",
+        "popis": "Místní/ubytovací poplatky. Protiúčty 43-8206670217 a 115-9579990277 "
+                 "jsou VŽDY ubytovací poplatky bez ohledu na text. Na sdíleném účtu "
+                 "2402351507 (Parkování/Popelnice/Rezervní 1) rozliš textem "
+                 "'ubytovací'/'kapacity'.",
+        "dodavatele": [],
+        "protiucty": ["43-8206670217", "115-9579990277", "2402351507"],
+        "klicova_slova": ["Poplatek z ubytovací kapacity", "Ubytovaci poplatky", "ubytovací"],
+    },
+    {
+        "nazev": "Rezervní 1",
+        "popis": "Rezervní účet (2402351507) – zbytková kategorie: převody, které "
+                 "nesedí na Parkování/Popelnice/Ubytovací poplatky (např. 'Převod na "
+                 "auto'). ⚠️ Nemá řádek ve formuláři, viz docs/otazky-pro-klienta.md.",
+        "dodavatele": [],
+        "protiucty": ["2402351507"],
+        "klicova_slova": [],
     },
     {
         "nazev": "Rezervní 2",
@@ -541,6 +572,23 @@ KATEGORIE = [
         "protiucty": ["2602411244"],
         "klicova_slova": ["Rezervní 3"],
     },
+    {
+        "nazev": "Výdaje majitele",
+        "popis": "Osobní nákupy majitele – potraviny, drogerie, lékárna, hobbymarkety "
+                 "(OBI, zahradnictví), e-shopy, pronájem bytu Fibingr. Nepatří do "
+                 "firemních výdajů. Na účtu RD Ostatní (2901321222) sem patří KAŽDÝ "
+                 "karetní nákup u obchodníka, který není tankování (Benzín).",
+        "dodavatele": ["Lidl", "Rohlik.cz", "DR. MAX", "Fairhotel"],
+        "protiucty": ["670100-2200894925"],
+        "klicova_slova": [],
+    },
+    {
+        "nazev": "Benzín",
+        "popis": "PHM – tankování (SILMET, ZEROGAS). Vázáno na osobní/auto účty.",
+        "dodavatele": ["SILMET", "ZEROGAS", "CS Silmet"],
+        "protiucty": [],
+        "klicova_slova": [],
+    },
 ]
 
 # Kategorie kde faktura objektivně neexistuje nebo není vyžadována.
@@ -555,8 +603,8 @@ KATEGORIE_BEZ_FAKTURY: set[str] = {
     # Splátky úvěrů
     "Splátka", "Úrok",
     # Interní převody a rezervy
-    "Převod", "Premier",
-    "Rezervní 1", "Rezervní 2", "Rezervní 3",
+    "Převod", "Výdaj Premier",
+    "Parkování", "Popelnice", "Ubytovací poplatky", "Rezervní 1", "Rezervní 2", "Rezervní 3",
     # Hosté a příjmy
     "Kauce", "Vratka", "Airbnb", "Příjem energie",
     # Osobní výdaje majitele (nepatří do firemních výdajů)
@@ -613,9 +661,11 @@ ALIASY: dict[str, str] = {
     # vratka omylem poslané platby je vždy interní přesun, i když protiúčet
     # patří konkrétní kategorii (Spilberk apod.)
     "Mylná platba": "Převod",
+    "Booking": "Výdaj Booking",
+    "Premier": "Výdaj Premier",
 }
 
-KATEGORIE_PRIJMY_A_MAJITEL = [
+KATEGORIE_PRIJMOVE = [
     {
         "nazev": "Airbnb",
         "popis": "Příchozí výplaty z Airbnb (přes Citibank). PŘÍJEM. "
@@ -625,28 +675,54 @@ KATEGORIE_PRIJMY_A_MAJITEL = [
         "klicova_slova": ["G-", "/ROC/", "CITIBANK"],
     },
     {
-        "nazev": "Výdaje majitele",
-        "popis": "Osobní nákupy majitele – potraviny, drogerie, lékárna, hobbymarkety "
-                 "(OBI, zahradnictví), e-shopy, pronájem bytu Fibingr. Nepatří do "
-                 "firemních výdajů. Na účtu RD Ostatní (2901321222) sem patří KAŽDÝ "
-                 "karetní nákup u obchodníka, který není tankování (Benzín).",
-        "dodavatele": ["Lidl", "Rohlik.cz", "DR. MAX", "Fairhotel"],
-        "protiucty": ["670100-2200894925"],
-        "klicova_slova": [],
-    },
-    {
-        "nazev": "Benzín",
-        "popis": "PHM – tankování (SILMET, ZEROGAS). Vázáno na osobní/auto účty.",
-        "dodavatele": ["SILMET", "ZEROGAS", "CS Silmet"],
-        "protiucty": [],
-        "klicova_slova": [],
-    },
-    {
         "nazev": "Příjem energie",
         "popis": "Příjmy/přeplatky energií (L.D.Energy, Mixová Věra). PŘÍJEM.",
         "dodavatele": [],
         "protiucty": ["3342292", "2110568392"],
         "klicova_slova": [],
+    },
+    {
+        "nazev": "Příjem Booking",
+        "popis": "Příchozí tržby za rezervace zprostředkované Booking.com – přímé "
+                 "platby i platby kartou přes platební brány. PŘÍJEM. "
+                 "POZOR: nezaměňovat s 'Výdaj Booking' (provize).",
+        "dodavatele": [],
+        "protiucty": ["2550840118", "55550309", "115-1391640287"],
+        "klicova_slova": ["BOOKING.COM", "Global Payments", "GOPAY"],
+    },
+    {
+        "nazev": "Ostatní ubytování/služby",
+        "popis": "Přímé platby CZ institucí/firem za ubytování mimo OTA kanály "
+                 "(Melvil, Apartino, UCEEB, školy apod.), v CZK. PŘÍJEM.",
+        "dodavatele": ["Apartino"],
+        "protiucty": ["7323607001", "276654216"],
+        "klicova_slova": ["Ubytování", "UBYTOVACI SLUZBY"],
+    },
+    {
+        "nazev": "Ostatní ubytování EUR",
+        "popis": "Přímé platby institucí/firem za ubytování v EUR (zahraniční "
+                 "platby ze SK/zahraničních IBAN na EUR účet firmy, např. "
+                 "zahraniční školy). PŘÍJEM. Protiúčet se neopakuje (různí "
+                 "plátci) – rozhoduje klíčové slovo 'Ubytování' v poznámce "
+                 "na EUR účtu, ne konkrétní protiúčet.",
+        "dodavatele": [],
+        "protiucty": [],
+        "klicova_slova": ["Ubytování"],
+    },
+    {
+        "nazev": "Ostatní příjmy",
+        "popis": "Drobné nezařaditelné příchozí platby (např. eshop refundace Alza). PŘÍJEM.",
+        "dodavatele": [],
+        "protiucty": ["2531920104"],
+        "klicova_slova": [],
+    },
+    {
+        "nazev": "Příjem Premier",
+        "popis": "Příjmy ze služeb PremierHost. PŘÍJEM. "
+                 "POZOR: nezaměňovat s 'Výdaj Premier' (převod do Premier Fondu).",
+        "dodavatele": [],
+        "protiucty": ["2401715997"],
+        "klicova_slova": ["Premier"],
     },
 ]
 
@@ -750,11 +826,13 @@ POKLADNA_JMENA_KATEGORIE: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Nejsilnější deterministické pravidlo (deterministika.py) – přebíjí i
 # uživatelský štítek. Rozhodnutí uživatele 07/2026: platby na Premier Fond
-# jsou VŽDY "Premier" a platby na rezervní účty VŽDY příslušná "Rezervní N",
-# i když štítek říká jen "Převod"/"Doplatek".
+# jsou VŽDY "Výdaj Premier" a rezervní účty 2102351505/2602411244 VŽDY
+# příslušná "Rezervní N", i když štítek říká jen "Převod"/"Doplatek".
+# 2402351507 (Rezervní 1) NENÍ tady – ten účet je sdílený mezi Parkování/
+# Popelnice/Ubytovací poplatky/Rezervní 1 a rozhoduje se textem (klíčová
+# slova) přes AI/prepisy, ne pevně přes protiúčet.
 UCET_VZDY_KATEGORIE: dict[str, str] = {
-    "2203097403": "Premier",
-    "2402351507": "Rezervní 1",
+    "2203097403": "Výdaj Premier",
     "2102351505": "Rezervní 2",
     "2602411244": "Rezervní 3",
 }
@@ -817,4 +895,112 @@ VZDY_DODAVATEL_KATEGORIE: dict[str, str] = {
 # klíči ve VZDY_DODAVATEL_KATEGORIE. Viz aplikuj_vzdy_dodavatel() v prepisy.py.
 VYJIMKY_VZDY_DODAVATEL: dict[str, list[tuple[str, str]]] = {
     "alza": [("v24", "V24")],
+}
+
+# ---------------------------------------------------------------------------
+# Mapování kategorie → řádek Alokačního formuláře (docs/navrh-mapovani-kategorii-na-formular.md)
+# ---------------------------------------------------------------------------
+# ID řádku: "P<číslo>" = příjmový řádek (2–18), "N<číslo>" = výdajový řádek
+# (19–72). Číslo je původní pozice řádku ve formuláři (shodná na všech 4
+# listech entit). Hodnota může být:
+#   - řetězec "P4"/"N38"                – přímé mapování
+#   - dict {"CZK": "P4", "EUR": "P6"}    – řádek závisí na měně transakce
+#   - dict {"+": "P17", "-": "N19"}      – řádek závisí na znaménku Objemu
+#   - None                               – vědomě bez řádku (interní tok,
+#     nebo čeká na rozhodnutí klienta, viz docs/otazky-pro-klienta.md)
+# Kategorie, které tu chybí úplně, dopadnou jako nenamapované (P00/N00).
+MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
+    # --- Příjmy ---------------------------------------------------------
+    "Airbnb": "P2",
+    "Příjem Booking": "P3",
+    "Ostatní ubytování/služby": "P4",
+    "Ostatní ubytování EUR": "P6",
+    "Příjem Premier": "P8",
+    "Ostatní příjmy": "P16",
+    "DPH": {"+": "P17", "-": "N19"},
+    "Zvláštní výdaj": {"+": "P18", "-": "N20"},
+    # TODO klient (docs/otazky-pro-klienta.md): žádný příjmový řádek se
+    # jménem "energie" ve formuláři nenašel – ověřit, kam patří.
+    "Příjem energie": None,
+    # Ověřeno v eval datasetu: všech 19 historických výskytů má protiúčet
+    # 4503502 a štítek "Pojištění Taigo"/"Pojištění Arteon" (auta) – druhý
+    # deklarovaný protiúčet (40002-50404011, možná nemovitost) se v 5
+    # měsících dat ani jednou neobjevil. Dokud se neobjeví skutečná
+    # transakce nemovitostního pojištění, kategorie je fakticky jen auto.
+    # TODO klient: pokud 40002-50404011 skutečně chodí, potřeba nová
+    # kategorie pro nemovitost – ale POZOR, N34 "Pojištění nemovitosti" je
+    # sloučené s N33 (viz komentář níže), takže by musela mířit tam, ne na
+    # vlastní řádek.
+    "Pojištění": "N48",
+
+    # --- Výdaje: provize a systémy ----------------------------------------
+    "Výdaj Booking": "N22",
+    "Provize Previo": "N23",
+    # --- Výdaje: nájmy / energie / jednotky ------------------------------
+    "V14 nájem": "N24", "V14 energie": "N24",
+    "Kotlářská": "N25",
+    "Šremer": "N26",
+    "V19": "N27",
+    "A63": "N28", "A73": "N28",
+    "A82": "N29",
+    "B53": "N32", "A43": "N32",  # TODO klient: A43 možná patří i na N28
+    # Řádky 33-38 (Parkování/Pojištění nemovitosti/Vzdělávání+reprezentace/
+    # Nemoc/Ubytovací poplatky/Ostatní poplatky) jsou ve formuláři sloučené
+    # do JEDNÉ datové buňky na řádku 33 (ověřeno: ws.merged_cells,
+    # C33:O38 sloučeno na všech 4 listech entit) – všechny čtyři kategorie
+    # proto míří na stejné ID N33, ne na svoje "vlastní" řádky.
+    "Parkování": "N33",
+    "Reprezentace": "N33",  # sloučená buňka, ne vlastní N35 (viz komentář výš)
+    "Ubytovací poplatky": "N33",  # sloučená buňka, ne vlastní N37
+    "Poplatek": "N33",  # sloučená buňka, ne vlastní N38
+    "Arteon": "N39",
+    # Řádky 40-41 (Auto - Benzín / Výdaje majitel) jsou taky sloučené do
+    # jedné datové buňky na řádku 40 (ověřeno stejným způsobem).
+    "Benzín": "N40",
+    "Výdaje majitele": "N40",  # sloučená buňka, ne vlastní N41
+    "Splátka": "N42",  # TODO klient: řádek 43 "Splátky Raiffeisen" bez jasného protějšku
+    "Internet": "N44",
+    "Previo systém": "N45",
+    "Google": "N46",
+    "Telefony": "N47",
+    "Úrok": "N49",
+    "Recepční": "N50",
+    "Úklid": "N51",
+    "Design": "N52",
+    "Výplata majitele": "N53",
+    "Rosi": "N54",
+    "Garant": "N55",
+    "Socka": "N56",
+    "Zdravka": "N57",
+    "FU": "N58",
+    "Snídaně": "N59",
+    "Taxi": "N60",
+    "Popelnice": "N61",
+    "Jídlo": "N62",
+    "Dekorace": "N63",
+    "Drogerie": "N64",
+    "Kancelář": "N65",
+    "Technik": "N66",
+    "Prádelna": "N68",
+    "Ostatní služby": "N70",
+    "Netflix a Spotify": "N71",
+
+    # --- Vědomě bez řádku (interní toky) ---------------------------------
+    "Převod": None,
+    "Banka": None,
+    # Řádky 79-82 ("Ostatní": Rezervní 2, Rezervní 3, Jiný příjem, Jiná
+    # vratka) jsou ruční/agregační, žádná kategorie skriptu se tam nenapojuje
+    # (rozhodnutí uživatele) – všechny tři Rezervní kategorie jsou čistě
+    # interní přesun peněz, ne skutečný příjem/výdaj.
+    "Rezervní 1": None,  # zbytek po rozpadu, viz docs/otazky-pro-klienta.md
+    "Rezervní 2": None,
+    "Rezervní 3": None,
+
+    # --- Čeká na klienta (docs/otazky-pro-klienta.md) --------------------
+    "Výdaj Premier": None,
+    "Spilberk": None,
+    "Prostory": None,
+    "Kauce": None,
+    "V24": None,
+    "Vratka": "N21",
 }

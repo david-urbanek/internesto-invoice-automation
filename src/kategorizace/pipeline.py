@@ -24,6 +24,7 @@ from .prepisy import (
     aplikuj_kotlarska_pronajem_bytu,
     aplikuj_pradlo_pokladna,
     aplikuj_prevod_zpetna_platba,
+    aplikuj_radek_formulare,
     aplikuj_telefony_nejvyssi_castka,
     aplikuj_vzdy_dodavatel,
     omezene_kategorie_pro_soubor,
@@ -70,6 +71,7 @@ def zpracuj_job_core(
     transakce = aplikuj_prevod_zpetna_platba(transakce)
     transakce = aplikuj_telefony_nejvyssi_castka(transakce)
     transakce = aplikuj_vzdy_dodavatel(transakce, omezene_kategorie=omezene_kategorie)
+    transakce = aplikuj_radek_formulare(transakce, firma_nazev)
     os.makedirs(os.path.dirname(job["vystup"]), exist_ok=True)
     uloz_csv(job["vystup"], transakce, list(transakce[0].keys()))
     return {"transakce": len(transakce), "faktury": len(faktury), "prazdny": False}

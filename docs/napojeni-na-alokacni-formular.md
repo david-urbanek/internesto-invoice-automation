@@ -166,7 +166,7 @@ Skript to sám nerozhodne, protože tu informaci nemá.
 | `DPH` | 17 PLUS / 19 MÍNUS | podle znaménka `Objem` — řeší se až v Apps Scriptu |
 | `Zvláštní výdaj` | 18 PLUS / 20 MÍNUS | totéž |
 | `Reprezentace` | 35 Vzdělávání / 72 Osobní + dárky | **automaticky nerozhodnutelné** — buď nová kategorie, nebo natvrdo do jednoho řádku |
-| `Poplatek`, `Banka`, `Úrok` | 37 / 38 / 49 / 61 | **nejhorší uzel** — 4 řádky poplatků na 3 kategorie, potřebuje rozhodnutí klienta |
+| `Poplatek`, `Banka`, `Úrok`, `Rezervní 1` | N37 / N38 / N49 / N61 (+ N33 Parkování) | **nejhorší uzel — částečně rozklíčováno, ještě nepotvrzeno klientem:** skutečné popisky řádků: N37 „Ubytovací a rekreační poplatky", N38 „Ostatní poplatky + DPPO + Havárie + Popelnice", N49 „Jiné poplatky + úroky", N61 „Popelnice". Navrhováno: `Poplatek→N38`, `Úrok→N49` (bankovní úrok z úvěru). `Rezervní 1` (config.py:524, protiúčty `2402351507`/`43-8206670217`/`115-9579990277`) je sama o sobě 1:N — podle textu v `zprava`/`stitek` (ověřeno v `scratch_dataset.json`) se rozpadá na "parkování"→N33, "popelnice"→N61, "ubytovací poplatky" (i pevně podle protiúčtů `43-8206670217`/`115-9579990277`)→N37. **Nevyřešeno:** nalezen i případ "Převod na auto" v `Rezervní 1`, který nesedí do žádného z těchto tří — kam patří? `Banka` (hotovostní odvod/vklad z pokladny) zatím navrženo jako `None` (nejde do formuláře, jako `Převod`) — potvrdit. |
 
 ### 3d) Řádky formuláře bez protějšku ve skriptu (~20)
 
@@ -418,6 +418,6 @@ text k vložení do `Rozšíření → Apps Script`.
 ## Poznámky k dohledání
 
 - `Šremer` → řádek 26 „Nájem Vlhká Honza"? Neověřeno, jen odhad podle názvu.
-- `Spilberk`, `Prostory`, `Premier`, `Rezervní 1` — kam patří ve formuláři?
+- `Spilberk`, `Prostory` — kam patří ve formuláři? (`Premier` vyřešeno → P8 "PLUS zvláštní příjem | Služby PremierHost"; `Rezervní 1` viz sekce 3c — částečně vyřešeno, případ "Převod na auto" otevřený)
 - Ověřit, jestli rozbité vzorce (4.4) jsou i v ostatních 11 měsících.
 - `Kauce` — má se ve formuláři vůbec objevit, nebo je to průběžná položka?

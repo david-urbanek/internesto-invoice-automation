@@ -37,7 +37,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .ai import kategorizuj_transakce
-from .config import ALIASY, KATEGORIE, KATEGORIE_PRIJMY_A_MAJITEL
+from .config import ALIASY, KATEGORIE, KATEGORIE_PRIJMOVE
 from .deterministika import aplikuj_deterministickou_kategorizaci
 from .prepisy import (
     aplikuj_interni_prevod,
@@ -56,7 +56,7 @@ load_dotenv()
 
 DATA_SLOZKA = "data"
 VYSTUP_NESHODY = os.path.join(DATA_SLOZKA, "eval_neshody.csv")
-ZNAME_KATEGORIE = {k["nazev"] for k in KATEGORIE + KATEGORIE_PRIJMY_A_MAJITEL}
+ZNAME_KATEGORIE = {k["nazev"] for k in KATEGORIE + KATEGORIE_PRIJMOVE}
 
 
 # ---------------------------------------------------------------------------
