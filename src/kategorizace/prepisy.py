@@ -211,7 +211,10 @@ def aplikuj_vychozi_kategorii_ucet(
             continue
         for t in transakce:
             kategorie = t.get("Kategorie", "")
-            if kategorie == "Převod" or kategorie == vychozi:
+            # "Mamka nájem" (deterministika.py, protiúčet 1751450015) je
+            # záměrně jiná kategorie než "vychozi" – soukromá platba od
+            # Michaely Dančové, ne příjem firmy z ubytování.
+            if kategorie in (vychozi, "Převod", "Mamka nájem"):
                 continue
             puvodni_poznamka = t.get("Poznamka", "")
             t["Kategorie"] = vychozi

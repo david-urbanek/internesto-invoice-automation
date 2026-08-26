@@ -732,6 +732,17 @@ KATEGORIE_PRIJMOVE = [
         "protiucty": [],
         "klicova_slova": [],
     },
+    {
+        "nazev": "Mamka nájem",
+        "popis": "Rozhodnutí uživatele (08/2026): pravidelná platba od "
+                 "Michaely Dančové (matka) na účet Casa Příjmový – "
+                 "soukromá platba za nájem, ne příjem firmy z ubytování. "
+                 "Deterministicky podle protiúčtu, bez ohledu na částku. "
+                 "Vědomě BEZ řádku v alokačním formuláři (MAPOVANI_NA_FORMULAR).",
+        "dodavatele": [],
+        "protiucty": ["1751450015"],
+        "klicova_slova": [],
+    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -799,7 +810,9 @@ OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
     },
     "2201422348": {  # Casa Libre s.r.o. | Příjmový 1 CZK (Fio)
         "klicove_slovo": "casa prijmovy",
-        "kategorie": ["Ostatní ubytování CZK", "Převod"],
+        # "Mamka nájem" povoleno navíc (08/2026): deterministická platba
+        # od Michaely Dančové (protiúčet 1751450015) – viz KATEGORIE_PRIJMOVE.
+        "kategorie": ["Ostatní ubytování CZK", "Převod", "Mamka nájem"],
         "vychozi": "Ostatní ubytování CZK",
     },
     "2301240402": {  # Nesty Services s.r.o. | Příjmový 1 CZK (Fio)
@@ -963,6 +976,9 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     "Ostatní ubytování EUR": "P6",
     "Příjem Premier": "P8",
     "Ostatní příjmy": "P16",
+    # Rozhodnutí uživatele (08/2026): "Mamka nájem" (soukromá platba od
+    # Michaely Dančové, ne příjem firmy) nemá ve formuláři protějšek vůbec.
+    "Mamka nájem": None,
     "DPH": {"+": "P17", "-": "N19"},
     # Rozhodnutí uživatele (08/2026): "Zvláštní výdaj" nemá ve formuláři
     # protějšek vůbec, ani jako příjem, ani jako výdaj.
