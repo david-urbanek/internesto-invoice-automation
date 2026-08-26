@@ -36,7 +36,15 @@ def najdi_firmy() -> list[dict]:
         trans_slozka = os.path.join(firma_slozka, "transactions")
         if not os.path.isdir(trans_slozka):
             continue
-        soubory = sorted(glob.glob(os.path.join(trans_slozka, "*.csv")))
+        # Rozdělení na Prijmove/Vydajove (08/2026) zúží nabídku kategorií
+        # pro AI/deterministiku (viz omezene_kategorie_pro_soubor v prepisy.py).
+        # Soubory ležící volně v transactions/ (bez rozdělení) se pořád
+        # zpracují, jen bez tohoto zúžení – přechodné období.
+        soubory = sorted(
+            glob.glob(os.path.join(trans_slozka, "*.csv"))
+            + glob.glob(os.path.join(trans_slozka, "Prijmove", "*.csv"))
+            + glob.glob(os.path.join(trans_slozka, "Vydajove", "*.csv"))
+        )
         joby = []
         for soubor in soubory:
             nazev = os.path.splitext(os.path.basename(soubor))[0]

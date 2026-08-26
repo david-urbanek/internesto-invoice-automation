@@ -20,34 +20,36 @@ Na listu RD je na řádku 28 "A73" místo "A43", a A43 je navíc na všech
 čtyřech listech i na řádku 32. Je to překlep na listu RD, nebo A43
 skutečně patří na obě místa (a jak se to pak nemá sečíst dvakrát)?
 
-## 2. `V24` — řádek 31? Podezření na kolizi jako u `Booking`/`Premier`
+## 2. `V24` — vyřešeno, mapuje na N31 (⚠️ obsahový nesoulad zůstává)
 
-Řádek 31 se doslova jmenuje "Nájem Fond - Vlhká 24 včetně energií" (nájem),
-ale kategorie `V24` v `config.py` je popsaná jako "Vybavení a rekonstrukce
-jednotky V24 – nábytek/dekorace" (dodavatelé JYSK, IKEA, Mobelix, Alza) —
-to je nákup nábytku, ne nájem.
+Rozhodnutí uživatele (08/2026): kategorie `V24` míří na řádek 31 „Nájem
+Fond - Vlhká 24 včetně energií" (`config.py`, `MAPOVANI_NA_FORMULAR["V24"] = "N31"`).
 
-1. Existuje pro nájem Vlhká 24 vůbec samostatná kategorie ve skriptu (jako
-   `V19`, `Kotlářská`, `Šremer` mají svoje), nebo se dosud kategorizovalo
-   špatně/vůbec?
-2. Kam má jít nákup nábytku (dnešní `V24`) — nový řádek, nebo pod `N63`
-   "Drobný majetek + dekorace + opravy + lékárna" (tam by svým obsahem
-   sedělo líp)?
+⚠️ Riziko ponechané vědomě otevřené: popis kategorie `V24` v `config.py`
+(`KATEGORIE`) zní na nábytek/dekoraci (dodavatelé JYSK, IKEA, Mobelix,
+Alza), ne na nájem. Deterministická pravidla i AI budou dál řadit nákupy
+nábytku do `V24`, a ty teď poputují na řádek 31 „Nájem" místo výdajového
+řádku za vybavení. Pokud je to nechtěné, potřeba buď přejmenovat/rozdělit
+kategorii, nebo řádek 31 opravdu obsahuje i vybavení jednotky (ověřit
+u klienta, co přesně řádek 31 sčítá).
 
 ## 3. `Výdaj Premier` (fond) — kam patří ve formuláři, pokud vůbec?
 
 Skript zná (protiúčet `2203097403`, interní přesun do Premier Fondu),
 formulář na to nemá řádek.
 
-## 4. `Spilberk`, `Prostory` — kam patří ve formuláři?
+## 4. `Prostory` — kam patří ve formuláři?
 
-Obě kategorie skript zná (mezifiremní fakturace Spilberk/Cejl 79, nájem
-prostor Nesty), formulář na ně nemá řádek.
+Skript zná kategorii (nájem prostor Nesty), formulář na ni nemá řádek.
+
+✅ Vyřešeno: `Spilberk` přejmenováno na `C79`, namapováno na `N30`
+„Nájem Fond - A24-A83 včetně energií" (rozhodnutí uživatele, 08/2026).
 
 ## 5. `Kauce` — má se ve formuláři vůbec objevit?
 
-Nebo je to průběžná položka mimo formulář (vratná kauce hosta, ne skutečný
-příjem/výdaj firmy)?
+✅ Vyřešeno: ne, `Kauce` do formuláře nepatří (`MAPOVANI_NA_FORMULAR["Kauce"] = None`)
+— je to vratná kauce hosta, ne skutečný příjem/výdaj firmy (rozhodnutí
+uživatele, 08/2026).
 
 ## 6. "Převod na auto" (nalezeno v `Rezervní 1`)
 
@@ -79,8 +81,8 @@ nejbližší kandidát (`B53`/`Úrok`, oba na účtu `6430097786` u
 Raiffeisenbank) už je mapovaný jinam (N32, resp. N49). Existuje samostatná
 raiffeisenská splátka jistiny, kterou skript zatím nerozezná?
 
-## 10. `Příjem energie` — chybí mu řádek
+## 10. `Příjem energie` — vyřešeno
 
-Ve viditelných příjmových řádcích (2–18) není nic se slovem "energie".
-Kam patří (nejbližší kandidát: `P16` "Ostatní příjmy")?
+Rozhodnutí uživatele (08/2026): `Příjem energie` patří na `P16`
+"Ostatní příjmy" (`config.py`, `MAPOVANI_NA_FORMULAR`).
 

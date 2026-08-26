@@ -55,16 +55,23 @@ Společné napříč všemi soubory jsou jen: `Datum`, `Objem`, `Poznámka`,
 2. **Měsíční listy** — `Leden` … `Prosinec`. Jen odkazy na listy entit.
 3. **`Přehled`** — jen odkazy na měsíční listy.
 
-Struktura řádků na listu entity (na všech čtyřech shodná):
+Struktura řádků na listu entity (na všech čtyřech shodná), od 08/2026
+doplněno o statický **ID sloupec `C`** (`P2`…`P18` příjmy, `N19`…`N73`
+výdaje, `CELKEM_*`/`OSTATNI_*` pro souhrnné řádky) a měsíční sloupce
+posunuté na `D`–`O` (`P` = roční součet):
 
 | Řádky | Blok |
 |---|---|
 | 2–18 | Příjmy |
-| 19–72 | Výdaje |
-| 73–77 | CELKEM (součty) |
-| 79–82 | Ostatní (Rezervní 2, Rezervní 3, Jiný příjem, Jiná vratka) |
+| 19–73 | Výdaje (73 = nově přidaný „Nájem prostor – Nesty", ID `N73`) |
+| 74–78 | CELKEM (součty) |
+| 80–83 | Ostatní (Rezervní 2, Rezervní 3, Jiný příjem, Jiná vratka) |
 
-Celkem **72 datových řádků**.
+Celkem **73 datových řádků**. Měsíční listy se na entity listy odkazují
+přes `INDEX/MATCH` podle ID sloupce `C`, ne pevným číslem řádku/sloupce –
+nové řádky lze přidávat kamkoli do bloku, aniž by se rozbily vzorce
+v měsíčních listech (jen je nutné dohlídnout SUM rozsahy v řádcích 74–78
+a sloučené buňky).
 
 ---
 
@@ -184,7 +191,8 @@ Skript to sám nerozhodne, protože tu informaci nemá.
 | 15 | Hotovost/Poukaz Ostatní |
 | 16 | Ostatní příjmy |
 
-Z příjmů skript zná jen `Airbnb` (ř. 2), `Příjem energie`, `Kauce`, `Vratka`.
+Z příjmů skript zná jen `Airbnb` (ř. 2), `Příjem energie` (od 08/2026
+namapováno na ř. 16, sdílí s `Ostatní příjmy`), `Kauce`, `Vratka`.
 
 Dále chybí: 30 (Nájem Fond A24-A83), 33 (Parkování), 36 (Nemoc),
 67 (Jiná propagace), 69 (Služby spojené s hostem).
@@ -197,7 +205,8 @@ Dále chybí: 30 (Nájem Fond A24-A83), 33 (Parkování), 36 (Nemoc),
 
 ### 3e) Kategorie skriptu bez protějšku ve formuláři
 
-`Převod`, `Premier`, `Rezervní 1`, `Spilberk`, `Prostory`, `Kauce`
+`Převod`, `Rezervní 1`, `Spilberk`, `Kauce` — `Prostory` má od 08/2026
+řádek `N73` (viz `MAPOVANI_NA_FORMULAR` v `config.py`).
 
 ---
 
@@ -418,6 +427,6 @@ text k vložení do `Rozšíření → Apps Script`.
 ## Poznámky k dohledání
 
 - `Šremer` → řádek 26 „Nájem Vlhká Honza"? Neověřeno, jen odhad podle názvu.
-- `Spilberk`, `Prostory` — kam patří ve formuláři? (`Premier` vyřešeno → P8 "PLUS zvláštní příjem | Služby PremierHost"; `Rezervní 1` viz sekce 3c — částečně vyřešeno, případ "Převod na auto" otevřený)
+- `Prostory` — kam patří ve formuláři? (`Premier` vyřešeno → P8 "PLUS zvláštní příjem | Služby PremierHost"; `Rezervní 1` viz sekce 3c — částečně vyřešeno, případ "Převod na auto" otevřený; `Spilberk` přejmenováno na `C79` → N30 "Nájem Fond - A24-A83 včetně energií", vyřešeno)
 - Ověřit, jestli rozbité vzorce (4.4) jsou i v ostatních 11 měsících.
-- `Kauce` — má se ve formuláři vůbec objevit, nebo je to průběžná položka?
+- `Kauce` — vyřešeno: do formuláře nepatří, viz `docs/otazky-pro-klienta.md` bod 5.

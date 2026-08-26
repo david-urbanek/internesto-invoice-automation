@@ -169,14 +169,8 @@ KATEGORIE = [
         "protiucty": [],
         "klicova_slova": ["Pokuta", "RADARY"],
     },
-    {
-        "nazev": "Banka",
-        "popis": "Hotovostní operace s bankou z pokladny (odvod/vklad hotovosti do banky, "
-                 "typicky Radek). Štítek 'Banka' nebo 'Radek - banka'.",
-        "dodavatele": [],
-        "protiucty": [],
-        "klicova_slova": ["Radek - banka"],
-    },
+    # "Banka" (hotovostní odvod/vklad pokladna↔banka) sloučeno do "Převod"
+    # (rozhodnutí uživatele 08/2026) – viz ALIASY a Převod.klicova_slova.
 
     # =======================================================================
     # MZDY A LIDÉ (dle přehledu mezd)
@@ -249,7 +243,7 @@ KATEGORIE = [
         "nazev": "DPH",
         "popis": "Platba DPH finančnímu úřadu (RD i Nesty). Bez dokladu.",
         "dodavatele": [],
-        # 2203097403 odstraněn – platby na Premier Fond jsou VŽDY "Výdaj Premier"
+        # 2203097403 odstraněn – platby na Premier Fond jsou VŽDY "Převod"
         # (rozhodnutí uživatele 07/2026, viz UCET_VZDY_KATEGORIE)
         "protiucty": ["705-77628621"],
         "klicova_slova": ["DPH"],
@@ -455,7 +449,7 @@ KATEGORIE = [
         "klicova_slova": ["FAKTURUJEME VAM SLUZBY"],
     },
     {
-        "nazev": "Spilberk",
+        "nazev": "C79",
         "popis": "Mezifiremní fakturace ubytovacích služeb – Spilberk / Cejl 79 (C79). Dle FA.",
         "dodavatele": ["Spilberk"],
         "protiucty": ["2702904169", "2502904199"],
@@ -500,26 +494,22 @@ KATEGORIE = [
     {
         "nazev": "Převod",
         "popis": ("Interní převody mezi firemními účty + výběry/vklady hotovosti z bankomatu "
-                  "a půjčky/splátky společníka. Není to skutečný výdaj – jen přesun peněz. "
+                  "a půjčky/splátky společníka, hotovostní odvod/vklad pokladna↔banka a "
+                  "převod na účet Premier Fond. Není to skutečný výdaj – jen přesun peněz. "
                   "Označit, ALE NEzahrnovat do výdajových součtů."),
         "dodavatele": [],
-        # Dřívější samostatné kategorie "Převod Výdajový 1/2" sloučeny sem
-        # (rozhodnutí uživatele 07/2026) – viz ALIASY.
+        # Dřívější samostatné kategorie "Převod Výdajový 1/2", "Banka" a
+        # "Výdaj Premier" sloučeny sem (rozhodnutí uživatele 07/2026 a
+        # 08/2026) – viz ALIASY.
         "protiucty": ["2200973033", "2901813198", "2601728813", "2301240402",
                       "2201422348", "2901321222", "1177419020", "5845640002",
                       # doplněno z analýzy schválených výpisů leden–květen 2026
-                      "2107482336", "064450-6005980009"],
+                      "2107482336", "064450-6005980009",
+                      "2203097403"],  # Premier Fond
         "klicova_slova": ["Převod na Výdajový", "Převod na výdajový",
                           "První část na Výdajový", "Odklad", "Výběr z bankomatu",
                           "Vklad do bankomatu", "Půjčka společníka", "Splátka společníka",
-                          "Mylná platba"],
-    },
-    {
-        "nazev": "Výdaj Premier",
-        "popis": "Převod na účet Premier Fond (2203097403). Interní tok – přesun peněz, ne výdaj.",
-        "dodavatele": [],
-        "protiucty": ["2203097403"],
-        "klicova_slova": ["Premier"],
+                          "Mylná platba", "Radek - banka", "Premier"],
     },
     {
         "nazev": "Parkování",
@@ -603,14 +593,14 @@ KATEGORIE_BEZ_FAKTURY: set[str] = {
     # Splátky úvěrů
     "Splátka", "Úrok",
     # Interní převody a rezervy
-    "Převod", "Výdaj Premier",
+    "Převod",
     "Parkování", "Popelnice", "Ubytovací poplatky", "Rezervní 1", "Rezervní 2", "Rezervní 3",
     # Hosté a příjmy
     "Kauce", "Vratka", "Airbnb", "Příjem energie",
     # Osobní výdaje majitele (nepatří do firemních výdajů)
     "Výdaje majitele", "Benzín",
     # Pokuty, poplatky a hotovostní operace pokladny
-    "Poplatek", "Banka",
+    "Poplatek",
 }
 
 ALIASY: dict[str, str] = {
@@ -646,7 +636,7 @@ ALIASY: dict[str, str] = {
     "Previo": "Previo systém", "Previo piny": "Previo systém",
     "Vlhká 24 léto": "V24", "Vlhká 24": "V24", "V24 únor": "V24", "V24 bžezen": "V24",
     "Dekorace 2": "Dekorace",
-    "C79 únor": "Spilberk", "C79 březen": "Spilberk", "C79": "Spilberk",
+    "C79 únor": "C79", "C79 březen": "C79", "Spilberk": "C79",
     "Účetní únor": "Rosi", "Účetní březen": "Rosi",
     "převod": "Převod", "Výdajový 2": "Převod", "RD Ostatní": "Převod",
     "DPH Nesty": "DPH", "DPH do plusu": "DPH",
@@ -659,10 +649,12 @@ ALIASY: dict[str, str] = {
     "Benzín převod?": "Benzín",
     "Pokuta": "Poplatek",
     # vratka omylem poslané platby je vždy interní přesun, i když protiúčet
-    # patří konkrétní kategorii (Spilberk apod.)
+    # patří konkrétní kategorii (C79 apod.)
     "Mylná platba": "Převod",
     "Booking": "Výdaj Booking",
-    "Premier": "Výdaj Premier",
+    "Premier": "Převod",
+    "Banka": "Převod", "Radek - banka": "Převod", "Výdaj Premier": "Převod",
+    "Ostatní ubytování/služby": "Ostatní ubytování CZK",
 }
 
 KATEGORIE_PRIJMOVE = [
@@ -691,9 +683,14 @@ KATEGORIE_PRIJMOVE = [
         "klicova_slova": ["BOOKING.COM", "Global Payments", "GOPAY"],
     },
     {
-        "nazev": "Ostatní ubytování/služby",
+        "nazev": "Ostatní ubytování CZK",
         "popis": "Přímé platby CZ institucí/firem za ubytování mimo OTA kanály "
-                 "(Melvil, Apartino, UCEEB, školy apod.), v CZK. PŘÍJEM.",
+                 "(Melvil, Apartino, UCEEB, školy apod.), v CZK. PŘÍJEM. "
+                 "Rozhodnutí uživatele (08/2026): na příjmových účtech Casa "
+                 "Libre a Nesty Services (OMEZENE_KATEGORIE_PODLE_UCTU) je "
+                 "tohle JEDINÁ povolená příjmová kategorie – přejmenováno "
+                 "z 'Ostatní ubytování/služby', aby název odpovídal páru "
+                 "s 'Ostatní ubytování EUR'.",
         "dodavatele": ["Apartino"],
         "protiucty": ["7323607001", "276654216"],
         "klicova_slova": ["Ubytování", "UBYTOVACI SLUZBY"],
@@ -723,6 +720,17 @@ KATEGORIE_PRIJMOVE = [
         "dodavatele": [],
         "protiucty": ["2401715997"],
         "klicova_slova": ["Premier"],
+    },
+    {
+        "nazev": "Hotovost",
+        "popis": "Rozhodnutí uživatele (08/2026): veškeré příjmy na "
+                 "příjmovém účtu Pokladny patří do téhle jediné kategorie "
+                 "(OMEZENE_KATEGORIE_PODLE_UCTU) – mapuje se na řádek "
+                 "'Hotovost' v alokačním formuláři (dřív 'Faktura Hotově "
+                 "CZK', ID P11). PŘÍJEM.",
+        "dodavatele": [],
+        "protiucty": [],
+        "klicova_slova": [],
     },
 ]
 
@@ -771,6 +779,43 @@ JIDLO_PODLE_PROVEDL: dict[str, str] = {
 #   "kategorie"  – uzavřený POVOLOVACÍ seznam, AI smí vybrat jen z něj
 #   "vyloucene"  – VYLUČOVACÍ seznam, AI smí vybrat cokoliv KROMĚ těchto
 OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
+    # Rozhodnutí uživatele (08/2026): na příjmových účtech Casa a Nesty
+    # nechodí historicky nic jiného než platby za ubytování mimo OTA kanály.
+    # Rozhodnutí uživatele (08/2026, upřesnění): "kategorie" pořád omezuje,
+    # co smí AI vybrat, ale "vychozi" navíc zajišťuje, že VŠECHNO, co na
+    # tomto účtu skončí jinak než "Převod" (Neurčeno, chybná kategorie z
+    # doby před omezením apod.), se na konci pipeline (prepisy.
+    # aplikuj_vychozi_kategorii_ucet) přepíše na tuhle jedinou kategorii –
+    # na těchto účtech reálně nechodí nic jiného než ubytování a interní
+    # převody.
+    # Musí být PŘED "POKLADNA_HOTOVOST" a "rd ostatni" jen kvůli pořadí
+    # kontroly klíčových slov, i když se navzájem nepřekrývají.
+    "2401780748": {  # Casa Libre s.r.o. | Příjmový 1 EUR (Fio)
+        # musí být PŘED "2201422348" – "casa prijmovy" je podřetězec
+        # "casa prijmovy eur", jinak by CZK záznam EUR soubor předběhl.
+        "klicove_slovo": "casa prijmovy eur",
+        "kategorie": ["Ostatní ubytování EUR", "Převod"],
+        "vychozi": "Ostatní ubytování EUR",
+    },
+    "2201422348": {  # Casa Libre s.r.o. | Příjmový 1 CZK (Fio)
+        "klicove_slovo": "casa prijmovy",
+        "kategorie": ["Ostatní ubytování CZK", "Převod"],
+        "vychozi": "Ostatní ubytování CZK",
+    },
+    "2301240402": {  # Nesty Services s.r.o. | Příjmový 1 CZK (Fio)
+        "klicove_slovo": "nesty prijmovy",
+        "kategorie": ["Ostatní ubytování CZK", "Převod"],
+        "vychozi": "Ostatní ubytování CZK",
+    },
+    # Rozhodnutí uživatele (08/2026): na příjmovém účtu Pokladny je jediná
+    # povolená kategorie "Hotovost" (řádek "Hotovost" v alokačním
+    # formuláři, dřív "Faktura Hotově CZK", ID P11). Musí být PŘED
+    # "POKLADNA_HOTOVOST" níž, jinak by obecné klíčové slovo "pokladna"
+    # zachytilo soubor dřív a vrátilo špatný (vylučovací) seznam.
+    "POKLADNA_PRIJMOVY": {
+        "klicove_slovo": "pokladna prijmov",
+        "kategorie": ["Hotovost"],
+    },
     "2901321222": {  # RD Group s.r.o. | Ostatní CZK (Fio)
         # POZOR: klíčové slovo musí obsahovat i firmu – samotné "ostatni" by
         # chytalo i "Nesty Ostatní", který uzavřený seznam mít nesmí.
@@ -826,13 +871,13 @@ POKLADNA_JMENA_KATEGORIE: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Nejsilnější deterministické pravidlo (deterministika.py) – přebíjí i
 # uživatelský štítek. Rozhodnutí uživatele 07/2026: platby na Premier Fond
-# jsou VŽDY "Výdaj Premier" a rezervní účty 2102351505/2602411244 VŽDY
+# jsou VŽDY "Převod" a rezervní účty 2102351505/2602411244 VŽDY
 # příslušná "Rezervní N", i když štítek říká jen "Převod"/"Doplatek".
 # 2402351507 (Rezervní 1) NENÍ tady – ten účet je sdílený mezi Parkování/
 # Popelnice/Ubytovací poplatky/Rezervní 1 a rozhoduje se textem (klíčová
 # slova) přes AI/prepisy, ne pevně přes protiúčet.
 UCET_VZDY_KATEGORIE: dict[str, str] = {
-    "2203097403": "Výdaj Premier",
+    "2203097403": "Převod",
     "2102351505": "Rezervní 2",
     "2602411244": "Rezervní 3",
 }
@@ -913,15 +958,18 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     # --- Příjmy ---------------------------------------------------------
     "Airbnb": "P2",
     "Příjem Booking": "P3",
-    "Ostatní ubytování/služby": "P4",
+    "Ostatní ubytování CZK": "P4",
+    "Hotovost": "P11",
     "Ostatní ubytování EUR": "P6",
     "Příjem Premier": "P8",
     "Ostatní příjmy": "P16",
     "DPH": {"+": "P17", "-": "N19"},
-    "Zvláštní výdaj": {"+": "P18", "-": "N20"},
-    # TODO klient (docs/otazky-pro-klienta.md): žádný příjmový řádek se
-    # jménem "energie" ve formuláři nenašel – ověřit, kam patří.
-    "Příjem energie": None,
+    # Rozhodnutí uživatele (08/2026): "Zvláštní výdaj" nemá ve formuláři
+    # protějšek vůbec, ani jako příjem, ani jako výdaj.
+    "Zvláštní výdaj": None,
+    # Rozhodnutí uživatele (08/2026): "Příjem energie" patří na P16
+    # "Ostatní příjmy" (stejný řádek jako kategorie "Ostatní příjmy").
+    "Příjem energie": "P16",
     # Ověřeno v eval datasetu: všech 19 historických výskytů má protiúčet
     # 4503502 a štítek "Pojištění Taigo"/"Pojištění Arteon" (auta) – druhý
     # deklarovaný protiúčet (40002-50404011, možná nemovitost) se v 5
@@ -987,7 +1035,6 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
 
     # --- Vědomě bez řádku (interní toky) ---------------------------------
     "Převod": None,
-    "Banka": None,
     # Řádky 79-82 ("Ostatní": Rezervní 2, Rezervní 3, Jiný příjem, Jiná
     # vratka) jsou ruční/agregační, žádná kategorie skriptu se tam nenapojuje
     # (rozhodnutí uživatele) – všechny tři Rezervní kategorie jsou čistě
@@ -996,11 +1043,20 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     "Rezervní 2": None,
     "Rezervní 3": None,
 
-    # --- Čeká na klienta (docs/otazky-pro-klienta.md) --------------------
-    "Výdaj Premier": None,
-    "Spilberk": None,
-    "Prostory": None,
+    # Rozhodnutí uživatele (08/2026): nový řádek 73 "Nájem prostor – Nesty
+    # (X.01, E03, E09)" přidán do data/2026 Alokační formulář.xlsx (entity
+    # listy RD/Nesty/Casa/Pokladna), ID sloupec C, viz
+    # docs/napojeni-na-alokacni-formular.md.
+    "Prostory": "N73",
+    # Rozhodnutí uživatele (08/2026): "Kauce" do formuláře nepatří —
+    # vratná kauce hosta, ne skutečný příjem/výdaj firmy.
     "Kauce": None,
-    "V24": None,
+    # Rozhodnutí uživatele (08/2026): "V24" míří na N31 "Nájem Fond -
+    # Vlhká 24 včetně energií", i když popis kategorie v KATEGORIE výše
+    # zní na nábytek/dekorace (viz docs/otazky-pro-klienta.md bod 2).
+    "V24": "N31",
+    # Rozhodnutí uživatele (08/2026): kategorie přejmenována ze "Spilberk"
+    # na "C79", namapována na N30 "Nájem Fond - A24-A83 včetně energií".
+    "C79": "N30",
     "Vratka": "N21",
 }

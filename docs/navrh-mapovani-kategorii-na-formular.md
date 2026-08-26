@@ -34,13 +34,14 @@ pro příjmovou transakci, takže alias nic nerozbije).
 | Kategorie | Rozlišovací signál | Cílový řádek |
 |---|---|---|
 | `Příjem Booking` | protiúčty `2550840118` (Booking.com přímo), `55550309` (Global Payments), `115-1391640287` (GoPay) | **P3** „Platební terminál" |
-| `Ostatní ubytování/služby` (CZK) | protiúčty typu Melvil (`7323607001`), Apartino (`276654216`), UCEEB — přímé platby CZ institucí za ubytování mimo OTA kanály | **P4** |
-| `Ostatní ubytování EUR` | zahraniční platby (SK/jiné IBAN) na EUR účet firmy, rozhoduje klíčové slovo "Ubytování" — protiúčet se neopakuje, plátci jsou různí (např. zahraniční školy) | **P6** |
+| `Ostatní ubytování CZK` (dřív „Ostatní ubytování/služby") | protiúčty typu Melvil (`7323607001`), Apartino (`276654216`), UCEEB — přímé platby CZ institucí za ubytování mimo OTA kanály. Rozhodnutí uživatele (08/2026): na příjmových účtech Casa (`2201422348`) a Nesty (`2301240402`) je to JEDINÁ povolená příjmová kategorie (`OMEZENE_KATEGORIE_PODLE_UCTU`) | **P4** |
+| `Ostatní ubytování EUR` | zahraniční platby (SK/jiné IBAN) na EUR účet firmy, rozhoduje klíčové slovo "Ubytování" — protiúčet se neopakuje, plátci jsou různí (např. zahraniční školy). Na Casa Příjmový 1 EUR (`2401780748`) jediná povolená kategorie | **P6** |
 | `Ostatní příjmy` | drobné příchozí refundace od dodavatelů (např. Alza, protiúčet `2531920104`) | **P16** |
 | `Příjem Premier` | protiúčet `2401715997` (Tomáš, "Příjmový Vlhká 9") | **P8** „PLUS zvláštní příjem \| Služby PremierHost" |
+| `Hotovost` (nová, 08/2026) | rozhodnutí uživatele: na příjmovém účtu Pokladny je to JEDINÁ povolená kategorie (`OMEZENE_KATEGORIE_PODLE_UCTU`) | **P11** „Hotovost" (dřív „Faktura Hotově CZK") |
 
-Plus stávající `Airbnb` a `Příjem energie` zůstávají beze změny (řádky
-P2, resp. bez explicitního řádku v seznamu — ověřit přesné číslo).
+Plus stávající `Airbnb` (P2) a `Příjem energie` (P16, sdílí řádek s
+`Ostatní příjmy` — rozhodnutí uživatele, viz bod 6) zůstávají beze změny.
 
 ---
 
@@ -94,6 +95,15 @@ firemní výdaj.
   10/10 nalezených transakcí v eval datasetu). Řádek 26 se doslova jmenuje
   "Nájem - Vlhká Honza včetně energie" — "Honza" je zdrobnělina "Jan",
   sedí na "Jan Šremer".
+- ✅ **`Zvláštní výdaj` → žádný řádek.** Rozhodnutí uživatele (08/2026):
+  kategorie do Alokačního formuláře vůbec nepatří (`MAPOVANI_NA_FORMULAR["Zvláštní výdaj"] = None`),
+  bez ohledu na znaménko částky.
+- ✅ **`Příjem energie` → `P16` „Ostatní příjmy".** Rozhodnutí uživatele
+  (08/2026), viz `docs/otazky-pro-klienta.md` bod 10.
+- ✅ **`V24` → `N31` „Nájem Fond - Vlhká 24 včetně energií".** Rozhodnutí
+  uživatele (08/2026); ⚠️ obsahový nesoulad zůstává (kategorie `V24` je
+  popsaná jako nábytek/dekorace, ne nájem) — viz `docs/otazky-pro-klienta.md`
+  bod 2.
 
 ## 7. Otevřené otázky pro klienta
 

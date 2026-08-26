@@ -48,6 +48,7 @@ from .prepisy import (
     aplikuj_pradlo_pokladna,
     aplikuj_prevod_zpetna_platba,
     aplikuj_telefony_nejvyssi_castka,
+    aplikuj_vychozi_kategorii_ucet,
     aplikuj_vzdy_dodavatel,
     omezene_kategorie_pro_soubor,
 )
@@ -190,6 +191,7 @@ def vyhodnot_vypis(cesta: str, mesic: str, client: genai.Client) -> dict:
     aplikuj_prevod_zpetna_platba(transakce)
     aplikuj_telefony_nejvyssi_castka(transakce)
     aplikuj_vzdy_dodavatel(transakce, omezene_kategorie=omezene)
+    aplikuj_vychozi_kategorii_ucet(transakce, nazev)
 
     for t, lidska in zip(transakce, lidske):
         truth = normalizuj_lidskou(lidska) if lidska.strip() else None

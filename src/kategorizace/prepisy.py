@@ -12,10 +12,21 @@ na účtu Nesty Ostatní přepíše kategorii na osobní výdaj podle toho, kdo
 transakci provedl (sloupec "Provedl" z Fio výpisu) – viz JIDLO_PODLE_PROVEDL
 a UCET_NESTY_OSTATNI v config.py.
 
-omezene_kategorie_pro_soubor – pozná, že výpis patří k účtu s uzavřeným
-seznamem historicky možných kategorií (viz OMEZENE_KATEGORIE_PODLE_UCTU
-v config.py) a vrátí tento seznam pro ai.kategorizuj_transakce, aby AI mohla
-vybírat jen z něj místo z celého seznamu kategorií.
+omezene_kategorie_pro_soubor – pozná uzavřený seznam kategorií pro daný
+výpis ve dvou vrstvách: (1) konkrétní účet s historicky jedinou možnou
+kategorií (OMEZENE_KATEGORIE_PODLE_UCTU v config.py), (2) když se výpis
+podle účtu nenajde, podle rodičovské složky "Prijmove"/"Vydajove" (rozdělení
+firmy/<Firma>/transactions/ zavedené 08/2026) – příjmová složka nabídne jen
+KATEGORIE_PRIJMOVE, výdajová jen KATEGORIE. Soubory ležící přímo
+v transactions/ (bez rozdělení) mají obojí, jako dřív.
+
+aplikuj_vychozi_kategorii_ucet – na účtech s definovaným "vychozi" v
+OMEZENE_KATEGORIE_PODLE_UCTU (Casa/Nesty Příjmový) je tahle kategorie
+výchozí pro VŠECHNO, co na daném výpisu skončí jinak než "Převod" – ať už
+AI vrátila kategorii mimo uzavřený seznam ("Neurčeno"), nebo nějaký dřívější
+přepis přiřadil jinou kategorii. Musí běžet AŽ PO všech ostatních přepisech
+(hlavně po aplikuj_interni_prevod), aby skutečné interní převody zůstaly
+"Převod".
 
 aplikuj_kotlarska_pronajem_bytu – na účtu RD Příjmový (UCET_RD_PRIJMOVY)
 přepíše kategorii na "Kotlářská" u transakcí se štítkem "pronájem bytu"
@@ -128,18 +139,38 @@ def _je_ucet_ostatni(nazev_souboru: str) -> bool:
     return _soubor_patri_uctu(nazev_souboru, UCET_NESTY_OSTATNI, "ostatni")
 
 
+def _slozka_prijem_vydaj(nazev_souboru: str) -> str | None:
+    """
+    Pozná podle rodičovské složky, jestli výpis patří do transactions/Prijmove
+    nebo transactions/Vydajove. Vrátí "prijmove" / "vydajove" / None (soubor
+    leží přímo v transactions/, bez rozdělení).
+    """
+    slozka = _bez_diakritiky(os.path.basename(os.path.dirname(nazev_souboru)))
+    if slozka == "prijmove":
+        return "prijmove"
+    if slozka == "vydajove":
+        return "vydajove"
+    return None
+
 def omezene_kategorie_pro_soubor(nazev_souboru: str) -> list[str] | None:
     """
     Pro výpisy s historicky omezenou nabídkou kategorií vrátí seznam, ze
     kterého má AI vybírat (pro ai.kategorizuj_transakce), jinak None.
 
-    Prohledá OMEZENE_KATEGORIE_PODLE_UCTU (config.py) podle čísla účtu nebo
-    klíčového slova v názvu souboru (viz _soubor_patri_uctu) – klíč slovníku
-    je jen identifikátor záznamu, není potřeba znát firma_nazev. Každý
-    záznam má buď "kategorie" (uzavřený POVOLOVACÍ seznam – AI smí vybrat
-    jen z něj, např. RD Ostatní), nebo "vyloucene" (VYLUČOVACÍ seznam – AI
-    smí vybrat cokoliv KROMĚ těchto kategorií, např. Pokladna, kde nikdy
-    nesmí vyjít "Výdaje majitele").
+    Prohledá nejdřív OMEZENE_KATEGORIE_PODLE_UCTU (config.py) podle čísla
+    účtu nebo klíčového slova v názvu souboru (viz _soubor_patri_uctu) –
+    klíč slovníku je jen identifikátor záznamu, není potřeba znát
+    firma_nazev. Každý záznam má buď "kategorie" (uzavřený POVOLOVACÍ
+    seznam – AI smí vybrat jen z něj, např. RD Ostatní), nebo "vyloucene"
+    (VYLUČOVACÍ seznam – AI smí vybrat cokoliv KROMĚ těchto kategorií,
+    např. Pokladna, kde nikdy nesmí vyjít "Výdaje majitele"). Volitelný
+    klíč "vychozi" (viz aplikuj_vychozi_kategorii_ucet) navíc určuje
+    kategorii, na kterou se na konci pipeline přepíše úplně všechno na
+    tomto účtu, co skončí jinak než "Převod".
+
+    Když nic z toho nesedí, spadne na rozdělení podle složky (viz
+    _slozka_prijem_vydaj) – transactions/Prijmove/ dostane jen
+    KATEGORIE_PRIJMOVE, transactions/Vydajove/ jen KATEGORIE.
     """
     for klic, zaznam in OMEZENE_KATEGORIE_PODLE_UCTU.items():
         if not _soubor_patri_uctu(nazev_souboru, klic, zaznam["klicove_slovo"]):
@@ -149,7 +180,49 @@ def omezene_kategorie_pro_soubor(nazev_souboru: str) -> list[str] | None:
         vyloucene = set(zaznam.get("vyloucene", []))
         vsechny_kategorie = [k["nazev"] for k in KATEGORIE + KATEGORIE_PRIJMOVE]
         return [n for n in vsechny_kategorie if n not in vyloucene]
+
+    smer = _slozka_prijem_vydaj(nazev_souboru)
+    if smer == "prijmove":
+        return [k["nazev"] for k in KATEGORIE_PRIJMOVE]
+    if smer == "vydajove":
+        return [k["nazev"] for k in KATEGORIE]
     return None
+
+
+def aplikuj_vychozi_kategorii_ucet(
+    transakce: list[dict],
+    nazev_souboru: str,
+) -> list[dict]:
+    """
+    Na účtech s definovaným "vychozi" v OMEZENE_KATEGORIE_PODLE_UCTU
+    (rozhodnutí uživatele 08/2026: Casa a Nesty Příjmový nemají historicky
+    žádný jiný příjem než ubytování mimo OTA kanály) přepíše kategorii na
+    tuhle výchozí hodnotu u KAŽDÉ transakce, jejíž finální kategorie není
+    "Převod" – bez ohledu na to, co k ní AI nebo dřívější přepisy došly
+    (Neurčeno mimo uzavřený seznam, chybně odhadnutá jiná příjmová
+    kategorie…). Musí běžet AŽ PO všech ostatních přepisech (hlavně
+    aplikuj_interni_prevod), jinak by přepsal i skutečné interní převody.
+    """
+    for klic, zaznam in OMEZENE_KATEGORIE_PODLE_UCTU.items():
+        vychozi = zaznam.get("vychozi")
+        if not vychozi:
+            continue
+        if not _soubor_patri_uctu(nazev_souboru, klic, zaznam["klicove_slovo"]):
+            continue
+        for t in transakce:
+            kategorie = t.get("Kategorie", "")
+            if kategorie == "Převod" or kategorie == vychozi:
+                continue
+            puvodni_poznamka = t.get("Poznamka", "")
+            t["Kategorie"] = vychozi
+            t["Poznamka"] = (
+                f"{puvodni_poznamka} Přepsáno z '{kategorie}' na výchozí kategorii "
+                f"'{vychozi}' – na tomto účtu je to jediná příjmová kategorie pro "
+                f"vše, co není Převod."
+            ).strip()
+        break
+
+    return transakce
 
 
 def aplikuj_kotlarska_pronajem_bytu(
@@ -285,7 +358,8 @@ def aplikuj_jidlo_pokladna(transakce: list[dict], firma_nazev: str) -> list[dict
         puvodni_poznamka = t.get("Poznamka", "")
         puvodni_kategorie = t.get("Kategorie")
         t["Kategorie"] = "Jídlo"
-        t["Poznamka"] = (
+        t["Poznamka"]
+        (
             f"{puvodni_poznamka} Přepsáno z '{puvodni_kategorie}' na 'Jídlo' – "
             f"hotovostní nákup pečiva/snídaně na Pokladně je Jídlo."
         ).strip()
