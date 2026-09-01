@@ -44,6 +44,7 @@ _EXT_PODPOROVANE = set(MIME_TYPY.keys()) | {".pdf"}
 class _FakturaMetadata(BaseModel):
     dodavatel: str
     castka: float | None
+    mena: str | None
     datum: str | None  # YYYY-MM-DD
     vs: str | None
     ucty: list[str]
@@ -101,7 +102,11 @@ def _extrahuj(cesta: str, client: genai.Client) -> dict:
     parts.append(types.Part.from_text(text=(
         "Z tohoto dokladu extrahuj:\n"
         "- dodavatel: název dodavatele (NE odběratele — ignoruj RD Group, Nesty, Casa Libre)\n"
-        "- castka: celková částka k úhradě v CZK jako desetinné číslo bez mezer\n"
+        "- castka: celková částka k úhradě PŘESNĚ tak, jak je uvedená na dokladu — "
+        "NEPŘEPOČÍTÁVEJ na CZK, i když je doklad v cizí měně (USD, EUR...); "
+        "desetinné číslo bez mezer\n"
+        "- mena: měna částky jako ISO 4217 kód (CZK, USD, EUR...); pokud doklad "
+        "měnu neuvádí, použij CZK\n"
         "- datum: datum vystavení nebo DUZP ve formátu YYYY-MM-DD\n"
         "- vs: variabilní symbol (pouze číslice, bez mezer)\n"
         "- ucty: čísla bankovních účtů dodavatele ve formátu základ/kód (např. '306744731/100')\n"
@@ -122,6 +127,7 @@ def _extrahuj(cesta: str, client: genai.Client) -> dict:
         meta = {
             "dodavatel": d.dodavatel,
             "castka": d.castka,
+            "mena": (d.mena or "CZK").strip().upper(),
             "datum": d.datum,
             "vs": d.vs,
             "ucty": d.ucty or [],
@@ -230,6 +236,12 @@ def filtruj_faktury(index: dict, slozka: str, datum_od: datetime, datum_do: date
 TOLERANCE_CASTKY = 1.0  # Kč – zaokrouhlení a drobné odchylky
 
 
+def _je_cizi_mena(meta: dict) -> bool:
+    """True, pokud faktura není v CZK – částku pak nelze přímo srovnávat s Kč na výpisu
+    (kurz + poplatky banky vždy udělají jiné číslo)."""
+    return str(meta.get("mena") or "CZK").strip().upper() not in ("CZK", "KČ", "KC")
+
+
 def _normalizuj_ucet(ucet: str) -> str:
     """Základní číslo účtu bez bankovního kódu a mezer."""
     ucet = re.sub(r"\s", "", ucet)
@@ -281,7 +293,7 @@ def predparuj(transakce: list[dict], index: dict) -> list[dict]:
             vs_mapa.setdefault(vs, []).append(fname)
 
         castka = meta.get("castka")
-        if castka is not None and meta.get("castka_overena", True):
+        if castka is not None and meta.get("castka_overena", True) and not _je_cizi_mena(meta):
             castka_r = round(float(castka), 2)
             for ucet in meta.get("ucty") or []:
                 zaklad = _normalizuj_ucet(str(ucet))
@@ -298,7 +310,7 @@ def predparuj(transakce: list[dict], index: dict) -> list[dict]:
                 continue
             meta = index[fname]
             fc = meta.get("castka")
-            fc = round(float(fc), 2) if fc is not None else None
+            fc = round(float(fc), 2) if fc is not None and not _je_cizi_mena(meta) else None
             castka_sedi = castka is not None and fc is not None and abs(fc - castka) <= TOLERANCE_CASTKY
             if not castka_sedi:
                 if vyzaduj_castku:
@@ -388,7 +400,8 @@ def kandidati_pro_transakci(
 
     Faktura se stane kandidátem jen když projde datovým oknem (vystavena max
     60 dní před platbou a max 14 dní po ní) a získá skóre ≥ 2 z těchto signálů:
-      - částka sedí (±1 Kč: +3) nebo přibližně sedí (±2 %: +2)
+      - částka sedí (±1 Kč: +3) nebo přibližně sedí (±2 %: +2) — jen pro faktury v CZK;
+        cizí měna (USD, EUR...) se s Kč na výpisu nesrovnává (kurz + poplatky)
       - shoda VS (+3), VS v názvu souboru nebo VS faktury ve zprávě (+2)
       - jméno dodavatele se vyskytuje v textu transakce (+2)
 
@@ -424,13 +437,16 @@ def kandidati_pro_transakci(
 
         fc = meta.get("castka")
         fc = round(float(fc), 2) if fc is not None else None
-        if castka is not None and fc is not None:
+        cizi_mena = _je_cizi_mena(meta)
+        if castka is not None and fc is not None and not cizi_mena:
             if abs(fc - castka) <= TOLERANCE_CASTKY:
                 skore += 3
                 duvody.append("částka sedí")
             elif abs(fc - castka) <= 0.02 * max(fc, castka):
                 skore += 2
                 duvody.append("částka přibližně sedí")
+        elif cizi_mena:
+            duvody.append(f"zahraniční faktura ({meta.get('mena')}) – částka nesrovnatelná s Kč")
 
         vs_f = _normalizuj_vs(meta.get("vs"))
         if vs_t and vs_f and (
@@ -456,6 +472,7 @@ def kandidati_pro_transakci(
                 "soubor": fname,
                 "dodavatel": dodavatel,
                 "castka": fc,
+                "mena": meta.get("mena") or "CZK",
                 "datum": meta.get("datum"),
                 "vs": meta.get("vs"),
                 "polozky": meta.get("polozky") or [],

@@ -26,6 +26,7 @@ report = "kategorizace.report:main"
 evaluace = "kategorizace.evaluace:main"
 radky = "kategorizace.radky:main"
 nahraj-na-drive = "kategorizace.drive:main"
+promazat-vypisy = "kategorizace.promazani:main"
 
 [build-system]
 requires = ["setuptools"]

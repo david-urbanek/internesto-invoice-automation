@@ -1,9 +1,0 @@
-*
-!.gitignore
-!README.md
-!Prijmove/
-!Vydajove/
-Prijmove/*
-Vydajove/*
-!Prijmove/.gitkeep
-!Vydajove/.gitkeep

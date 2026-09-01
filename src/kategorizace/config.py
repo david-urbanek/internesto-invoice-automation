@@ -131,13 +131,11 @@ KATEGORIE = [
         "dodavatele": ["Google", "Google CLOUD"],
         "protiucty": ["2500900397"],
     },
-    # POZN.: kategorie "Multisport" sloučena do "Ostatní služby" (07/2026)
-    # – dodavatel i protiúčet 2104561127 tam už byly, viz ALIASY.
     {
         "nazev": "Ostatní služby",
         "popis": "Různé služby nezařaditelné jinam (callcentrum, pošta, drobné poplatky).",
-        "dodavatele": ["Daktela", "AirWallet", "Česká pošta", "Multisport", "Coma Jurny", "Burda Design"],
-        "protiucty": ["2078745001", "2104561127", "170158265"],
+        "dodavatele": ["Daktela", "AirWallet", "Česká pošta", "Coma Jurny", "Burda Design"],
+        "protiucty": ["2078745001", "170158265"],
         "klicova_slova": ["FAKTURUJEME VAM ZA", "AIRWALLET", "Coma Jurny", "Burda Design"],
     },
     {
@@ -183,7 +181,10 @@ KATEGORIE = [
                        "Hlouskova Marcela", "Hadbavna Julia Sofia", "Podlouckova Katerina",
                        "Kuswitova Shabrina", "Necasova Lucie", "Bostik Zbynek",
                        "Marosova", "Dobos", "Soudni exekutor", "Urad prace",
-                       "Drackova Michaela", "Hyzova Natalia", "Melichova Emma"],
+                       "Drackova Michaela",
+                       "Velebova Barbora", "Cortes Miranda Arasaia Desibeth",
+                       "Kantorova Zuzana", "Soukop Samuel", "Moravcikova Michaela",
+                       "Pekova Gabriela", "Ducka Liliana"],
         "protiucty": ["354003954", "6015-229761", "115-1648560267", "3055051183",
                       "3799998003", "129886578",
                       # doplněno z analýzy schválených výpisů leden–květen 2026
@@ -198,9 +199,10 @@ KATEGORIE = [
         "popis": "Mzdy a odměny recepčních. Dle přehledu mezd.",
         "dodavatele": ["Aneta Hrušková", "Petr Moravčík", "Pavlína Jadrná",
                        "Bartonova Katerina", "Zalkovska Lucie", "Rybarova Ema",
-                       "Lipenska Sara", "Jezkova Eliska"],
+                       "Lipenska Sara", "Jezkova Eliska", "Hyzova Natalia",
+                       "Melichova Emma", "Multisport"],
         "protiucty": ["346775719", "35-1336730247", "23806170", "3020639163",
-                      "2703187907", "1863183011"],
+                      "2703187907", "1863183011", "2104561127"],
     },
     {
         "nazev": "Design",
@@ -596,7 +598,7 @@ KATEGORIE_BEZ_FAKTURY: set[str] = {
     "Převod",
     "Parkování", "Popelnice", "Ubytovací poplatky", "Rezervní 1", "Rezervní 2", "Rezervní 3",
     # Hosté a příjmy
-    "Kauce", "Vratka", "Airbnb", "Příjem energie",
+    "Kauce", "Vratka", "Airbnb",
     # Osobní výdaje majitele (nepatří do firemních výdajů)
     "Výdaje majitele", "Benzín",
     # Pokuty, poplatky a hotovostní operace pokladny
@@ -642,9 +644,9 @@ ALIASY: dict[str, str] = {
     "DPH Nesty": "DPH", "DPH do plusu": "DPH",
     "vratka": "Vratka", "Vratka peněz": "Vratka",
     "Airbank": "Airbnb",
-    "Přeplatek energie": "Příjem energie",
+    "Přeplatek energie": "Ostatní příjmy",
     "Ostatní": "Ostatní služby",
-    "Multisport": "Ostatní služby",
+    "Multisport": "Recepční",
     "Alza": "Dekorace",
     "Benzín převod?": "Benzín",
     "Pokuta": "Poplatek",
@@ -665,13 +667,6 @@ KATEGORIE_PRIJMOVE = [
         "dodavatele": [],
         "protiucty": ["4000230103"],
         "klicova_slova": ["G-", "/ROC/", "CITIBANK"],
-    },
-    {
-        "nazev": "Příjem energie",
-        "popis": "Příjmy/přeplatky energií (L.D.Energy, Mixová Věra). PŘÍJEM.",
-        "dodavatele": [],
-        "protiucty": ["3342292", "2110568392"],
-        "klicova_slova": [],
     },
     {
         "nazev": "Příjem Booking",
@@ -708,9 +703,10 @@ KATEGORIE_PRIJMOVE = [
     },
     {
         "nazev": "Ostatní příjmy",
-        "popis": "Drobné nezařaditelné příchozí platby (např. eshop refundace Alza). PŘÍJEM.",
+        "popis": "Drobné nezařaditelné příchozí platby (např. eshop refundace Alza) "
+                 "a příjmy/přeplatky energií (L.D.Energy, Mixová Věra). PŘÍJEM.",
         "dodavatele": [],
-        "protiucty": ["2531920104"],
+        "protiucty": ["2531920104", "3342292", "2110568392"],
         "klicova_slova": [],
     },
     {
@@ -983,9 +979,6 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     # Rozhodnutí uživatele (08/2026): "Zvláštní výdaj" nemá ve formuláři
     # protějšek vůbec, ani jako příjem, ani jako výdaj.
     "Zvláštní výdaj": None,
-    # Rozhodnutí uživatele (08/2026): "Příjem energie" patří na P16
-    # "Ostatní příjmy" (stejný řádek jako kategorie "Ostatní příjmy").
-    "Příjem energie": "P16",
     # Ověřeno v eval datasetu: všech 19 historických výskytů má protiúčet
     # 4503502 a štítek "Pojištění Taigo"/"Pojištění Arteon" (auta) – druhý
     # deklarovaný protiúčet (40002-50404011, možná nemovitost) se v 5

@@ -94,7 +94,7 @@ def _paruj_faktury(
         for k in kand:
             radek = (
                 f"  - {k['soubor']} | {k['dodavatel']} | "
-                f"{k['castka'] if k['castka'] is not None else '?'} CZK | "
+                f"{k['castka'] if k['castka'] is not None else '?'} {k.get('mena') or 'CZK'} | "
                 f"{k['datum'] or '?'} | VS {k['vs'] or '-'} | "
                 f"signály: {', '.join(k['duvody'])}"
             )
@@ -121,6 +121,7 @@ Pravidla:
 3. Karetní platby nemají VS – páruj podle dodavatele a částky; datum faktury bývá do několika dní od data platby.
 4. Jedna faktura patří typicky k jedné transakci – pokud stejný kandidát sedí na víc transakcí, přiřaď ho té s nejsilnějšími signály a u ostatních vrať "".
 5. jistota 0–100. Pod {MIN_JISTOTA_PAROVANI} znamená, že si nejsi jistý – v tom případě raději vrať "".
+6. Faktura v cizí měně (USD, EUR...) má na výpisu vždy jinou částku v Kč (kurz + poplatek banky) – tam částku vůbec nesrovnávej, páruj jen podle dodavatele a data.
 
 {chr(10).join(bloky)}
 
@@ -234,16 +235,19 @@ def kategorizuj_transakce(
             f"{faktura:<30}"
         )
 
-    prehled_radky = [f"{'Soubor':<55} {'Dodavatel':<30} {'CZK':>10} {'Datum':<12} {'Položky'}"]
+    prehled_radky = [f"{'Soubor':<55} {'Dodavatel':<30} {'Částka':>14} {'Datum':<12} {'Položky'}"]
     prehled_radky.append("-" * 140)
     index_mapa = firma_index or {}
     for fname in jmena_faktur:
         m = index_mapa.get(fname, {})
         polozky = ", ".join(m.get("polozky") or [])
+        castka_mena = (
+            f"{m.get('castka')} {m.get('mena') or 'CZK'}" if m.get("castka") is not None else "?"
+        )
         prehled_radky.append(
             f"{fname:<55} "
             f"{str(m.get('dodavatel') or ''):<30} "
-            f"{str(m.get('castka') or '?'):>10} "
+            f"{castka_mena:>14} "
             f"{str(m.get('datum') or '?'):<12} "
             f"{polozky}"
         )

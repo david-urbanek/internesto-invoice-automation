@@ -74,6 +74,9 @@ def zpracuj_job_core(
     transakce = aplikuj_vzdy_dodavatel(transakce, omezene_kategorie=omezene_kategorie)
     transakce = aplikuj_vychozi_kategorii_ucet(transakce, job["csv"])
     transakce = aplikuj_radek_formulare(transakce, firma_nazev)
+    for t in transakce:
+        t.setdefault("Špatně zvolená kategorie", "")
+        t.setdefault("Chyba ve faktuře", "")
     os.makedirs(os.path.dirname(job["vystup"]), exist_ok=True)
     uloz_csv(job["vystup"], transakce, list(transakce[0].keys()))
     return {"transakce": len(transakce), "faktury": len(faktury), "prazdny": False}

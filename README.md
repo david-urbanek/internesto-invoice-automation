@@ -82,6 +82,7 @@ uv run kategorizace
 | `uv run radky` | Přepočítá sloupce `Firma`/`Radek` ve stávajících `results/*.csv` bez volání AI — pro staré výsledky nebo po změně mapování v `config.py` |
 | `uv run report` | Zobrazí transakce bez spárované faktury (kde se faktura očekává) |
 | `uv run konfigurace` | Vypíše tabulku všech kategorií s popisem a typickými dodavateli |
+| `uv run promazat-vypisy` | Smaže obsah `transactions/Prijmove` a `transactions/Vydajove` u všech firem (po zpracování výpisů) — s potvrzením, přeskočit lze `-y` |
 
 ## Co se děje při spuštění kategorizace
 
@@ -105,6 +106,8 @@ Výsledný soubor obsahuje všechny původní sloupce z bankovního výpisu a na
 | `Jistota` | Skóre 0–100 (100 = absolutně jisté) |
 | `Firma` | RD / Nesty / Casa / Pokladna, podle složky |
 | `Radek` | ID řádku Alokačního formuláře (`P<n>` příjmy, `N<n>` výdaje, `P00`/`N00` = nenamapováno — viz `docs/pro-klienta/Prehled-kategorizace.pdf`) |
+| `Špatně zvolená kategorie` | Prázdné — pro ruční označení při kontrole výsledků |
+| `Chyba ve faktuře` | Prázdné — pro ruční označení při kontrole výsledků |
 
 ## Kategorie a konfigurace
 
