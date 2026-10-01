@@ -74,40 +74,72 @@ firmy/
 uv run kategorizace
 ```
 
+### 5. Normalizace výpisů a nahrání do Google Drive
+
+`uv run kategorizace` načte vstupy z `firmy/<firma>/transactions/`, sjednotí
+podporované rozdíly v názvech sloupců (např. `Datum platby` → `Datum`,
+`Příjem/Výdej` → `Objem`) a uloží nový normalizovaný CSV výsledek do
+`firmy/<firma>/results/`. Původní soubor nemění.
+
+Pro nahrání těchto výsledků jako nativních Google Sheets do cílové složky na
+Google Drive spusť:
+
+```bash
+uv run kategorizace
+uv run nahraj-na-drive
+```
+
+`nahraj-na-drive` nahraje všechny CSV soubory z `firmy/*/results/` i všechny
+normalizované XLSX soubory přímo v `data/upload/`. Soubor stejného názvu na
+Google Drive aktualizuje, nevytváří duplicitu.
+
+Pro ručně odkategorizovaný XLSX soubor je samostatná cesta:
+
+```text
+data/upload/Muj-vypis.xlsx
+```
+
+```bash
+uv run zpracuj-upload
+uv run nahraj-na-drive
+```
+
+`zpracuj-upload` doplní nebo přepočítá `Kategorie`, `Radek` a `Firma` ve všech
+`data/upload/*.xlsx`; tyto soubory pak `nahraj-na-drive` převede na Google
+Sheets. Pro nahrání je v `.env` nutné nastavit
+`GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE` a `GOOGLE_DRIVE_FOLDER_ID`.
+
 ## Příkazy
 
-| Příkaz                   | Co dělá                                                                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `uv run kategorizace`    | Spustí kategorizaci všech firem a uloží výsledky do `results/` (zahrnuje i sloupce `Firma`/`Radek`)                                      |
-| `uv run radky`           | Přepočítá sloupce `Firma`/`Radek` ve stávajících `results/*.csv` bez volání AI — pro staré výsledky nebo po změně mapování v `config.py` |
-| `uv run report`          | Zobrazí transakce bez spárované faktury (kde se faktura očekává)                                                                         |
-| `uv run konfigurace`     | Vypíše tabulku všech kategorií s popisem a typickými dodavateli                                                                          |
-| `uv run promazat-vypisy` | Smaže obsah `transactions/Prijmove` a `transactions/Vydajove` u všech firem (po zpracování výpisů) — s potvrzením, přeskočit lze `-y`    |
+| Příkaz                   | Co dělá                                                                                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uv run kategorizace`    | Spustí kategorizaci všech firem a uloží výsledky do`results/` (zahrnuje i sloupce `Firma`/`Radek`)                                                   |
+| `uv run radky`           | Přepočítá sloupce`Firma`/`Radek` ve stávajících `results/*.csv` bez volání AI — pro staré výsledky nebo po změně mapování v `config.py` |
+| `uv run report`          | Zobrazí transakce bez spárované faktury (kde se faktura očekává)                                                                                          |
+| `uv run konfigurace`     | Vypíše tabulku všech kategorií s popisem a typickými dodavateli                                                                                            |
+| `uv run promazat-vypisy` | Smaže obsah`transactions/Prijmove` a `transactions/Vydajove` u všech firem (po zpracování výpisů) — s potvrzením, přeskočit lze `-y`            |
 
 ## Co se děje při spuštění kategorizace
 
 1. **Indexování faktur** — Gemini přečte každou fakturu ze složky `invoices/` a extrahuje dodavatele, částku, datum, variabilní symbol a čísla účtů. Výsledek uloží do `.index.json` ve složce `invoices/`. Faktury, které se nezměnily, se příště přeskočí.
-
 2. **Deterministické předpárování** — transakce s jednoznačnou shodou (VS, nebo číslo účtu + přesná částka) se spárují s fakturami bez AI. Tato přiřazení Gemini nemůže přepsat.
-
 3. **Kategorizace přes Gemini** — pro každý CSV výpis odešle Gemini tabulku transakcí + přehled faktur z indexu + seznam kategorií. Ke každé transakci vrátí: kategorii, název souboru faktury, skóre jistoty (0–100) a poznámku.
-
 4. **Uložení výsledků** — výsledné CSV se uloží do `firmy/NazevFirmy/results/` se stejným názvem jako vstupní soubor.
 
 ## Výstupní CSV
 
 Výsledný soubor obsahuje všechny původní sloupce z bankovního výpisu a navíc:
 
-| Sloupec                    | Popis                                                                                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Kategorie`                | Přiřazená účetní kategorie                                                                                                                 |
-| `Faktura`                  | Název souboru faktury nebo `NENALEZENO`                                                                                                    |
-| `Poznamka`                 | Vysvětlení kategorizace od AI                                                                                                              |
-| `Jistota`                  | Skóre 0–100 (100 = absolutně jisté)                                                                                                        |
-| `Firma`                    | RD / Nesty / Casa / Pokladna, podle složky                                                                                                 |
-| `Radek`                    | ID řádku Alokačního formuláře (`P<n>` příjmy, `N<n>` výdaje, `P00`/`N00` = nenamapováno — viz `docs/pro-klienta/Prehled-kategorizace.pdf`) |
-| `Špatně zvolená kategorie` | Prázdné — pro ruční označení při kontrole výsledků                                                                                         |
-| `Chyba ve faktuře`         | Prázdné — pro ruční označení při kontrole výsledků                                                                                         |
+| Sloupec                         | Popis                                                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Kategorie`                   | Přiřazená účetní kategorie                                                                                                                                |
+| `Faktura`                     | Název souboru faktury nebo`NENALEZENO`                                                                                                                       |
+| `Poznamka`                    | Vysvětlení kategorizace od AI                                                                                                                                 |
+| `Jistota`                     | Skóre 0–100 (100 = absolutně jisté)                                                                                                                         |
+| `Firma`                       | RD / Nesty / Casa / Pokladna, podle složky                                                                                                                     |
+| `Radek`                       | ID řádku Alokačního formuláře (`P<n>` příjmy, `N<n>` výdaje, `P00`/`N00` = nenamapováno — viz `docs/pro-klienta/Prehled-kategorizace.pdf`) |
+| `Špatně zvolená kategorie` | Prázdné — pro ruční označení při kontrole výsledků                                                                                                    |
+| `Chyba ve faktuře`           | Prázdné — pro ruční označení při kontrole výsledků                                                                                                    |
 
 ## Kategorie a konfigurace
 
