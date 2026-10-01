@@ -865,13 +865,15 @@ UCET_TMOBILE = "19-2235210247"
 # Hotovostní výplaty na Pokladně podle jména (aplikuj_jmena_pokladna)
 # ---------------------------------------------------------------------------
 # Jméno v popisu hotovostní transakce → kategorie (mzda/odměna v hotovosti).
-# Ověřeno na schválených výpisech: Petr 7/7 Recepční, Vendula/Iva Úklid.
-# Hledá se jako celé slovo (case-insensitive, bez diakritiky), jen na Pokladně.
+# Ověřeno na schválené historii. Hledá se jako celé slovo (case-insensitive,
+# bez diakritiky), jen na Pokladně.
 POKLADNA_JMENA_KATEGORIE: dict[str, str] = {
     "vendula": "Úklid",
     "venda": "Úklid",
     "vendy": "Úklid",   # skloňovaný tvar ("Výplata Vendy M.")
     "iva": "Úklid",
+    "nemcova": "Úklid",
+    "hoskova": "Úklid",
     "petr": "Recepční",
 }
 
@@ -898,6 +900,9 @@ UCET_VZDY_KATEGORIE: dict[str, str] = {
 # hledá se case-insensitive) – čísla odběrných míst, čísla úvěrových smluv,
 # technické platby. Ověřeno na schválených výpisech leden–květen 2026.
 VZDY_TEXT_KATEGORIE: dict[str, str] = {
+    # Raiffeisen úroky – popis rozlišuje úrok od splátek na sdílených účtech.
+    "úrok z nevyčerpaného úvěru": "Úrok",
+    "úrok z úvěru": "Úrok",
     "361020403": "A43",     # odběrné místo Cejl 79
     "1694/25/021": "A43",   # úvěrová smlouva jednotky
     "361010303": "B53",     # odběrné místo Cejl 79
@@ -930,6 +935,8 @@ SPLATKY_UVERU: dict[str, list[float]] = {
 # case-insensitive) → kategorie, která platí VŽDY – ať jde o nákup (mínus),
 # nebo vratku/refundaci (plus). Viz aplikuj_vzdy_dodavatel() v prepisy.py.
 VZDY_DODAVATEL_KATEGORIE: dict[str, str] = {
+    # PriceLabs Dynamic Pricing je předplatné systému Previo.
+    "pricelabsinc*dynaprice": "Previo systém",
     "alza": "Dekorace",
     "silmet": "Benzín",
     "zerogas": "Benzín",

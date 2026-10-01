@@ -7,8 +7,10 @@ import unittest
 from openpyxl import Workbook
 
 from kategorizace.ai import kategorizuj_transakce
+from kategorizace.config import MAPOVANI_NA_FORMULAR
 from kategorizace.deterministika import aplikuj_deterministickou_kategorizaci
 from kategorizace.io import nacti_xlsx
+from kategorizace.prepisy import aplikuj_jmena_pokladna, aplikuj_vzdy_dodavatel
 
 
 class _FakeClient:
@@ -77,6 +79,54 @@ class TransactionValueTypeTests(unittest.TestCase):
         self.assertEqual(row["VS"], "")
         self.assertEqual(row["Název protiúčtu"], "")
 
+    def test_raiffeisen_interest_descriptions_are_deterministic(self):
+        rows = [
+            {"Název protiúčtu": "Úrok z úvěru"},
+            {"Název protiúčtu": "Úrok z nevyčerpaného úvěru"},
+        ]
+
+        result = aplikuj_deterministickou_kategorizaci(rows)
+
+        self.assertEqual([row.get("Kategorie") for row in result], ["Úrok", "Úrok"])
+        self.assertEqual(MAPOVANI_NA_FORMULAR["Úrok"], "N49")
+
+    def test_pricelabs_merchant_is_previo_system(self):
+        result = aplikuj_vzdy_dodavatel(
+            [{"Název protiúčtu": "PRICELABSINC*DYNAPRICE"}]
+        )
+
+        self.assertEqual(result[0].get("Kategorie"), "Previo systém")
+        self.assertEqual(MAPOVANI_NA_FORMULAR["Previo systém"], "N45")
+
+    def test_new_cleaning_people_apply_only_to_pokladna(self):
+        pokladna = [
+            {"Poznámka": "Výplata Němcová Tereza"},
+            {"Poznámka": "Výplata Hošková Eva"},
+        ]
+        banka = [{"Poznámka": "Výplata Hošková Eva"}]
+
+        aplikuj_jmena_pokladna(pokladna, "Pokladna")
+        aplikuj_jmena_pokladna(banka, "RD Group s.r.o.")
+
+        self.assertEqual(
+            [row.get("Kategorie") for row in pokladna],
+            ["Úklid", "Úklid"],
+        )
+        self.assertIsNone(banka[0].get("Kategorie"))
+
+    def test_supplied_raiffeisen_signatures_keep_existing_categories(self):
+        rows = [
+            {"Číslo protiúčtu": "2200973033/2010", "Objem": "-80000"},
+            {"Název protiúčtu": "771619 INKASO 3699/24/021/SME/PRP"},
+            {"Název protiúčtu": "772022 INKASO 1694/25/021/SME/PRP"},
+        ]
+
+        result = aplikuj_deterministickou_kategorizaci(rows)
+
+        self.assertEqual(
+            [row.get("Kategorie") for row in result],
+            ["Převod", "B53", "A43"],
+        )
 
 if __name__ == "__main__":
     unittest.main()

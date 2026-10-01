@@ -110,7 +110,7 @@ def aplikuj_interni_prevod(transakce: list[dict]) -> list[dict]:
 def _bez_diakritiky(s: str) -> str:
     return (
         s.lower()
-        .replace("á", "a").replace("í", "i").replace("é", "e")
+        .replace("á", "a").replace("í", "i").replace("é", "e").replace("ě", "e")
         .replace("ý", "y").replace("ř", "r").replace("š", "s")
         .replace("č", "c").replace("ž", "z").replace("ů", "u")
         .replace("ú", "u").replace("ň", "n").replace("ť", "t").replace("ď", "d")
