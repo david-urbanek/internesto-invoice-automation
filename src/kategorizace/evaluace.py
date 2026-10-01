@@ -215,7 +215,7 @@ def vyhodnot_vypis(cesta: str, mesic: str, client: genai.Client) -> dict:
                 "zprava": t.get("Zpráva pro příjemce", ""),
                 "pipeline": pred,
                 "clovek": truth,
-                "jistota": t.get("Jistota", ""),
+                "jistota": t.get("Jistota kategorie", ""),
                 "poznamka_ai": t.get("Poznamka", ""),
             })
     return vysledek

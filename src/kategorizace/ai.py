@@ -11,7 +11,7 @@ kategorizuj_transakce – hlavní funkce:
   3. AI KATEGORIZACE – druhý Gemini call přiřadí kategorie; faktury už jen čte
      jako vodítko (položky/dodavatel spárované faktury), neměni je.
 
-Výstupní sloupce: Kategorie, Faktura, Poznamka, Jistota a Parovani
+Výstupní sloupce: Kategorie, Faktura, Poznamka, Jistota kategorie a Jistota faktura
 (jak byla faktura přiřazena: deterministicky / AI / zamítnuto / prázdné).
 """
 
@@ -22,14 +22,19 @@ from google.genai import types
 from pydantic import BaseModel
 
 from .config import ALIASY, FIREMNI_UCTY, KATEGORIE, KATEGORIE_PRIJMOVE, MODEL
-from .faktura_index import kandidati_pro_transakci, predparuj
+from .faktura_index import kandidati_pro_transakci, over_prirazeni, predparuj
 
 MIN_JISTOTA_PAROVANI = 50
 
 
+def _text_hodnota(hodnota) -> str:
+    """Vrátí bezpečný text pro hodnoty z CSV/XLSX transakce."""
+    return "" if hodnota is None else str(hodnota)
+
+
 class _Parovani(BaseModel):
     id: int
-    faktura: str
+    kandidat: int  # pořadové číslo z shortlistu dané transakce (1..N), 0 = žádný nesedí
     jistota: int
 
 
@@ -71,7 +76,12 @@ def _paruj_faktury(
 ) -> None:
     """
     AI páruje nespárované transakce s fakturami – výběr POUZE z deterministických
-    kandidátů. Vše ostatní končí jako NENALEZENO. Zapisuje Faktura a Parovani.
+    kandidátů. Vše ostatní končí jako NENALEZENO. Zapisuje Faktura a Jistota faktura.
+
+    AI vrací POŘADOVÉ ČÍSLO kandidáta (ne název souboru) – některé faktury mají
+    v názvu (macOS screenshoty) rozloženou diakritiku nebo nezalomitelnou mezeru,
+    kterou by AI při doslovném opisu nespolehlivě reprodukovala 1:1, což by shodu
+    s indexem faktur nedeterministicky rozbíjelo (viz historie – "mimo kandidáty").
     """
     kandidati_mapa: dict[int, list[dict]] = {}
     for i, t in enumerate(transakce):
@@ -82,7 +92,7 @@ def _paruj_faktury(
             kandidati_mapa[i] = kand
         else:
             t["Faktura"] = "NENALEZENO"
-            t["Parovani"] = ""
+            t["Jistota faktura"] = ""
 
     if not kandidati_mapa:
         return
@@ -91,9 +101,9 @@ def _paruj_faktury(
     for i, kand in sorted(kandidati_mapa.items()):
         t = transakce[i]
         radky_k = []
-        for k in kand:
+        for poradi, k in enumerate(kand, start=1):
             radek = (
-                f"  - {k['soubor']} | {k['dodavatel']} | "
+                f"  {poradi}. {k['dodavatel']} | "
                 f"{k['castka'] if k['castka'] is not None else '?'} {k.get('mena') or 'CZK'} | "
                 f"{k['datum'] or '?'} | VS {k['vs'] or '-'} | "
                 f"signály: {', '.join(k['duvody'])}"
@@ -108,7 +118,7 @@ def _paruj_faktury(
             f"Protiúčet: {t.get('Číslo protiúčtu', t.get('Protiúčet', ''))} | "
             f"VS: {t.get('VS', '')} | Už.štítek: {t.get('Poznámka', '')} | "
             f"Zpráva: {t.get('Zpráva pro příjemce', '')}\n"
-            f"Kandidáti:\n" + "\n".join(radky_k)
+            f"Kandidáti (očíslovaní 1–{len(kand)}):\n" + "\n".join(radky_k)
         )
 
     prompt = f"""Jsi asistent pro párování bankovních transakcí s fakturami.
@@ -116,11 +126,11 @@ def _paruj_faktury(
 Pro každou transakci níže rozhodni, která z JEJÍCH kandidátních faktur k ní patří.
 
 Pravidla:
-1. Vybírej VÝHRADNĚ ze seznamu kandidátů dané transakce. Pokud žádný kandidát nesedí, vrať prázdný řetězec "".
+1. Vybírej VÝHRADNĚ číslo kandidáta ze seznamu dané transakce. Pokud žádný kandidát nesedí, vrať 0.
 2. Síla signálů: shoda VS > shoda částky + dodavatele > shoda samotné částky.
 3. Karetní platby nemají VS – páruj podle dodavatele a částky; datum faktury bývá do několika dní od data platby.
-4. Jedna faktura patří typicky k jedné transakci – pokud stejný kandidát sedí na víc transakcí, přiřaď ho té s nejsilnějšími signály a u ostatních vrať "".
-5. jistota 0–100. Pod {MIN_JISTOTA_PAROVANI} znamená, že si nejsi jistý – v tom případě raději vrať "".
+4. Jedna faktura patří typicky k jedné transakci – pokud stejný kandidát sedí na víc transakcí, přiřaď ho té s nejsilnějšími signály a u ostatních vrať 0.
+5. jistota 0–100. Pod {MIN_JISTOTA_PAROVANI} znamená, že si nejsi jistý – v tom případě raději vrať 0.
 6. Faktura v cizí měně (USD, EUR...) má na výpisu vždy jinou částku v Kč (kurz + poplatek banky) – tam částku vůbec nesrovnávej, páruj jen podle dodavatele a data.
 
 {chr(10).join(bloky)}
@@ -139,24 +149,24 @@ Vrať záznam pro každou transakci (celkem {len(kandidati_mapa)} záznamů)."""
         # Párování selhalo – transakce zůstanou NENALEZENO, kategorizace proběhne dál
         for i in kandidati_mapa:
             transakce[i]["Faktura"] = "NENALEZENO"
-            transakce[i]["Parovani"] = "AI párování selhalo"
+            transakce[i]["Jistota faktura"] = "AI párování selhalo"
         return
 
     vysledky = {v.id: v for v in response.parsed.transakce}
     for i, kand in kandidati_mapa.items():
         v = vysledky.get(i)
-        jmena = {k["soubor"] for k in kand}
-        if v and v.faktura and v.faktura in jmena and v.jistota >= MIN_JISTOTA_PAROVANI:
-            transakce[i]["Faktura"] = v.faktura
-            transakce[i]["Parovani"] = f"AI ({v.jistota} %)"
+        v_platny = v is not None and 1 <= v.kandidat <= len(kand)
+        if v_platny and v.jistota >= MIN_JISTOTA_PAROVANI:
+            transakce[i]["Faktura"] = kand[v.kandidat - 1]["soubor"]
+            transakce[i]["Jistota faktura"] = f"AI ({v.jistota} %)"
         else:
             transakce[i]["Faktura"] = "NENALEZENO"
-            if v and v.faktura and v.faktura not in jmena:
-                transakce[i]["Parovani"] = "AI zamítnuto ověřením (mimo kandidáty)"
-            elif v and v.faktura:
-                transakce[i]["Parovani"] = f"AI zamítnuto (jistota {v.jistota} %)"
+            if v and v.kandidat != 0 and not v_platny:
+                transakce[i]["Jistota faktura"] = "AI zamítnuto ověřením (mimo kandidáty)"
+            elif v_platny:
+                transakce[i]["Jistota faktura"] = f"AI zamítnuto (jistota {v.jistota} %)"
             else:
-                transakce[i]["Parovani"] = ""
+                transakce[i]["Jistota faktura"] = ""
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +197,7 @@ def kategorizuj_transakce(
 
     Returns:
         Stejný list dictů s přidanými klíči: Kategorie, Faktura, Poznamka,
-        Jistota, Parovani. Faktura je název souboru nebo "NENALEZENO".
+        Jistota kategorie, Jistota faktura. Faktura je název souboru nebo "NENALEZENO".
 
     Raises:
         ValidationError: Gemini vrátil neočekávanou strukturu (handled v cli.py)
@@ -200,14 +210,18 @@ def kategorizuj_transakce(
         transakce = predparuj(transakce, firma_index)
         for t in transakce:
             if t.get("_predparovano"):
-                t["Parovani"] = f"deterministicky ({t['_predparovano']})"
+                t["Jistota faktura"] = f"deterministicky ({t['_predparovano']})"
         _paruj_faktury(transakce, firma_index, povolene, client)
     else:
         # Bez indexu nelze sestavit kandidáty – párování se přeskočí
         for t in transakce:
             if not t.get("Faktura"):
                 t["Faktura"] = "NENALEZENO"
-                t["Parovani"] = "bez indexu faktur"
+                t["Jistota faktura"] = "bez indexu faktur"
+
+    # Poslední pojistka: ověří přiřazenou fakturu (deterministicky i AI) proti
+    # tvrdým signálům z indexu (VS, účet, částka) – viz faktura_index.over_prirazeni.
+    over_prirazeni(transakce, firma_index or {})
 
     # Transakce už zkategorizované deterministickou vrstvou
     # (deterministika.aplikuj_deterministickou_kategorizaci) do AI neposílej.
@@ -225,14 +239,14 @@ def kategorizuj_transakce(
         faktura = t.get("Faktura", "")
         radky.append(
             f"{i:<4} "
-            f"{t.get('Datum', ''):<12} "
-            f"{t.get('Objem', ''):>10} "
-            f"{t.get('Číslo protiúčtu', t.get('Protiúčet', '')):<18} "
-            f"{t.get('Název protiúčtu', ''):<26} "
-            f"{t.get('Poznámka', ''):<20} "
-            f"{t.get('Zpráva pro příjemce', ''):<28} "
-            f"{t.get('VS', ''):<12} "
-            f"{faktura:<30}"
+            f"{_text_hodnota(t.get('Datum')):<12} "
+            f"{_text_hodnota(t.get('Objem')):>10} "
+            f"{_text_hodnota(t.get('Číslo protiúčtu') or t.get('Protiúčet')):<18} "
+            f"{_text_hodnota(t.get('Název protiúčtu')):<26} "
+            f"{_text_hodnota(t.get('Poznámka')):<20} "
+            f"{_text_hodnota(t.get('Zpráva pro příjemce')):<28} "
+            f"{_text_hodnota(t.get('VS')):<12} "
+            f"{_text_hodnota(t.get('Faktura')):<30}"
         )
 
     prehled_radky = [f"{'Soubor':<55} {'Dodavatel':<30} {'Částka':>14} {'Datum':<12} {'Položky'}"]
@@ -354,7 +368,7 @@ Použij ID transakce přesně tak, jak je uvedeno v prvním sloupci."""
             kategorie = "Neurčeno"
         transakce[v.id]["Kategorie"] = kategorie
         transakce[v.id]["Poznamka"] = poznamka
-        transakce[v.id]["Jistota"] = v.jistota
+        transakce[v.id]["Jistota kategorie"] = v.jistota
 
     return _doplneno(transakce)
 
@@ -366,6 +380,7 @@ def _doplneno(transakce: list[dict]) -> list[dict]:
         t.setdefault("Kategorie", "Neurčeno")
         t.setdefault("Faktura", "NENALEZENO")
         t.setdefault("Poznamka", "")
-        t.setdefault("Jistota", "")
-        t.setdefault("Parovani", "")
+        t.setdefault("Jistota kategorie", "")
+        t.setdefault("Jistota faktura", "")
+        t.setdefault("Check přiřazení faktury", "")
     return transakce

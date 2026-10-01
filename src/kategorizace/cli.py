@@ -40,16 +40,20 @@ def najdi_firmy() -> list[dict]:
         # pro AI/deterministiku (viz omezene_kategorie_pro_soubor v prepisy.py).
         # Soubory ležící volně v transactions/ (bez rozdělení) se pořád
         # zpracují, jen bez tohoto zúžení – přechodné období.
+        kandidati = (
+            glob.glob(os.path.join(trans_slozka, "*"))
+            + glob.glob(os.path.join(trans_slozka, "Prijmove", "*"))
+            + glob.glob(os.path.join(trans_slozka, "Vydajove", "*"))
+        )
         soubory = sorted(
-            glob.glob(os.path.join(trans_slozka, "*.csv"))
-            + glob.glob(os.path.join(trans_slozka, "Prijmove", "*.csv"))
-            + glob.glob(os.path.join(trans_slozka, "Vydajove", "*.csv"))
+            cesta for cesta in kandidati
+            if os.path.isfile(cesta) and os.path.splitext(cesta)[1].lower() in {".csv", ".xlsx"}
         )
         joby = []
         for soubor in soubory:
             nazev = os.path.splitext(os.path.basename(soubor))[0]
             joby.append({
-                "csv": soubor,
+                "vstup": soubor,
                 "label": f"{firma_nazev} / {nazev}",
                 "vystup": os.path.join(firma_slozka, "results", f"{firma_nazev}-{nazev}.csv"),
             })

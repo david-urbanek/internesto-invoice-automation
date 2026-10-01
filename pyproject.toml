@@ -27,6 +27,7 @@ evaluace = "kategorizace.evaluace:main"
 radky = "kategorizace.radky:main"
 nahraj-na-drive = "kategorizace.drive:main"
 promazat-vypisy = "kategorizace.promazani:main"
+zpracuj-upload = "kategorizace.upload:main"
 
 [build-system]
 requires = ["setuptools"]

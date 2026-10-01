@@ -972,6 +972,9 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     "Ostatní ubytování EUR": "P6",
     "Příjem Premier": "P8",
     "Ostatní příjmy": "P16",
+    # Rozhodnutí uživatele (08/2026): "Příjem energie" sdílí řádek P16
+    # "Ostatní příjmy".
+    "Příjem energie": "P16",
     # Rozhodnutí uživatele (08/2026): "Mamka nájem" (soukromá platba od
     # Michaely Dančové, ne příjem firmy) nemá ve formuláři protějšek vůbec.
     "Mamka nájem": None,

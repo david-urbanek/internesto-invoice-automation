@@ -1,9 +1,11 @@
 """
-Čtení a zápis souborů: CSV výpisy z Fio banky a vyhledávání faktur.
+Čtení a zápis souborů: CSV/XLSX výpisy z bank a vyhledávání faktur.
 
-nacti_csv    – přeskočí metadata hlavičky Fio banky, auto-detekuje oddělovač
-uloz_csv     – zapíše výsledek ve formátu s BOM (kompatibilita s Excel)
-najdi_faktury – rekurzivní glob přes všechny podporované formáty dokladů
+nacti_csv       – přeskočí metadata hlavičky Fio banky, auto-detekuje oddělovač
+nacti_xlsx      – načte první list XLSX výpisu
+nacti_transakce – vybere parser podle přípony vstupního souboru
+uloz_csv        – zapíše výsledek ve formátu s BOM (kompatibilita s Excel)
+najdi_faktury   – rekurzivní glob přes všechny podporované formáty dokladů
 konvertuj_na_pdf – převod obrázku na PDF pro Gemini (který preferuje PDF)
 """
 
@@ -12,6 +14,7 @@ import glob
 import os
 import tempfile
 
+from openpyxl import load_workbook
 from PIL import Image
 
 from .config import ALIASY_SLOUPCU_CSV, CSV_SEPARATOR
@@ -59,6 +62,56 @@ def nacti_csv(cesta: str) -> list[dict]:
             for row in reader
         ]
         return _normalizuj_sloupce(radky)
+def nacti_xlsx(cesta: str) -> list[dict]:
+    """Načte transakce z prvního listu XLSX souboru."""
+    workbook = load_workbook(cesta, read_only=True, data_only=True)
+    try:
+        worksheet = workbook.active
+        rows = worksheet.iter_rows(values_only=True)
+        raw_headers = None
+        for row in rows:
+            headers = [str(value).strip() if value is not None else "" for value in row]
+            if any(headers):
+                raw_headers = headers
+                break
+        if raw_headers is None:
+            return []
+
+        headers = []
+        seen: dict[str, int] = {}
+        for header in raw_headers:
+            if header in seen:
+                seen[header] += 1
+                headers.append(f"{header}_{seen[header]}")
+            else:
+                seen[header] = 1
+                headers.append(header)
+
+        radky = []
+        for row in rows:
+            hodnoty = list(row)
+            if not any(value is not None and value != "" for value in hodnoty):
+                continue
+            radky.append({
+                header: value
+                for header, value in zip(headers, hodnoty)
+                if header
+            })
+        return _normalizuj_sloupce(radky)
+    finally:
+        workbook.close()
+
+
+def nacti_transakce(cesta: str) -> list[dict]:
+    """Načte CSV nebo XLSX výpis podle přípony souboru."""
+    pripona = os.path.splitext(cesta)[1].lower()
+    if pripona == ".csv":
+        return nacti_csv(cesta)
+    if pripona == ".xlsx":
+        return nacti_xlsx(cesta)
+    raise ValueError(f"Nepodporovaný formát transakcí: {cesta}")
+
+
 
 
 def _normalizuj_sloupce(radky: list[dict]) -> list[dict]:
@@ -68,11 +121,17 @@ def _normalizuj_sloupce(radky: list[dict]) -> list[dict]:
     Nemaže originální sloupec, jen přidává alias vedle něj – použije se JEN
     pokud kanonický sloupec ještě není v řádku přítomný (aby se nepřepsaly
     skutečné Fio sloupce, které se jmenují stejně jako kanonický název).
+
+    CSV i XLSX výpisy mají stejný kontrakt: hodnoty transakce jsou texty a
+    prázdné buňky jsou prázdné řetězce. Openpyxl jinak vrací čísla, datumy a
+    None, zatímco zbytek pipeline pracuje s CSV-like hodnotami.
     """
     for radek in radky:
         for puvodni, kanonicky in ALIASY_SLOUPCU_CSV.items():
             if kanonicky not in radek and puvodni in radek:
                 radek[kanonicky] = radek[puvodni]
+        for sloupec, hodnota in radek.items():
+            radek[sloupec] = "" if hodnota is None else str(hodnota)
     return radky
 
 

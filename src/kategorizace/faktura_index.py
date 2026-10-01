@@ -27,10 +27,12 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from io import BytesIO
 
 import fitz
 from google import genai
 from google.genai import types
+from PIL import Image
 from pydantic import BaseModel
 
 from .config import MODEL
@@ -38,7 +40,8 @@ from .io import MIME_TYPY
 
 INDEX_SOUBOR = ".index.json"
 TOLERANCE_DNI = 45
-_EXT_PODPOROVANE = set(MIME_TYPY.keys()) | {".pdf"}
+# .bmp není mezi MIME_TYPY (Gemini image/bmp nepodporuje) – převádí se na PNG v _extrahuj
+_EXT_PODPOROVANE = set(MIME_TYPY.keys()) | {".pdf", ".bmp"}
 
 
 class _FakturaMetadata(BaseModel):
@@ -81,7 +84,9 @@ def _overeni_extrakce(meta: dict, text: str | None) -> None:
 
 
 def _extrahuj(cesta: str, client: genai.Client) -> dict:
-    """Pošle fakturu do Gemini a vrátí extrahovaná metadata. PDF i obrázky se posílají jako bytes; z PDF se navíc přes PyMuPDF vytáhne text pro zpětné ověření extrakce."""
+    """Pošle fakturu do Gemini a vrátí extrahovaná metadata. PDF i obrázky se posílají jako bytes;
+    z PDF se navíc přes PyMuPDF vytáhne text pro zpětné ověření extrakce. Gemini nepodporuje
+    image/bmp přímo, proto se .bmp v paměti převede na PNG před odesláním."""
     ext = os.path.splitext(cesta)[1].lower()
     parts = []
     text_pdf = None
@@ -96,6 +101,10 @@ def _extrahuj(cesta: str, client: genai.Client) -> dict:
                 doc.close()
             except Exception:
                 text_pdf = None
+    elif ext == ".bmp":
+        buf = BytesIO()
+        Image.open(cesta).convert("RGB").save(buf, "PNG")
+        parts.append(types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"))
     else:
         return {}
 
@@ -195,7 +204,7 @@ def postav_index(slozka: str, client: genai.Client, progress=None) -> dict:
 # ---------------------------------------------------------------------------
 
 def _parsuj_datum(s: str) -> datetime | None:
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d.%m.%Y", "%m/%d/%Y", "%-m/%-d/%Y"):
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d.%m.%Y", "%m/%d/%Y", "%-m/%-d/%Y", "%m/%d/%y", "%d.%m.%y"):
         try:
             return datetime.strptime(s.strip(), fmt)
         except ValueError:
@@ -302,7 +311,7 @@ def predparuj(transakce: list[dict], index: dict) -> list[dict]:
 
     pouzite: set[str] = set()
 
-    def _vyber_vs(kandidati: list[str], castka: float | None, vyzaduj_castku: bool) -> str | None:
+    def _vyber_vs(kandidati: list[str], castka: float | None, vyzaduj_castku: bool, datum: datetime | None = None) -> str | None:
         """Z faktur se shodným VS vybere jednoznačnou; kolize rozhoduje částka."""
         zuzeni: list[tuple[str, bool]] = []
         for fname in dict.fromkeys(kandidati):
@@ -325,17 +334,45 @@ def predparuj(transakce: list[dict], index: dict) -> list[dict]:
         se_shodou = [f for f, sedi in zuzeni if sedi]
         if len(se_shodou) == 1:
             return se_shodou[0]
+        if len(se_shodou) > 1:
+            # Víc kandidátů se stejným VS i sedící částkou: pokud jde o duplicitní
+            # dokumentaci téže platby (stejný dodavatel, prakticky stejná částka –
+            # typicky zálohová faktura + daňový doklad k ní), rozhodne datum:
+            # vezme se ten, jehož datum na faktuře je nejblíž datu transakce.
+            # Bez použitelného data (chybí u faktur/transakce) padá na první.
+            prvni = index[se_shodou[0]]
+            castka0 = round(float(prvni.get("castka")), 2)
+            dodavatel0 = str(prvni.get("dodavatel") or "").strip().lower()
+            duplikaty = all(
+                str(index[f].get("dodavatel") or "").strip().lower() == dodavatel0
+                and abs(round(float(index[f].get("castka")), 2) - castka0) <= TOLERANCE_CASTKY
+                for f in se_shodou
+            )
+            if duplikaty:
+                if datum:
+                    s_datem = []
+                    for f in se_shodou:
+                        try:
+                            datum_f = datetime.fromisoformat(index[f]["datum"])
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                        s_datem.append((abs((datum - datum_f).days), f))
+                    if s_datem:
+                        s_datem.sort(key=lambda x: x[0])
+                        return s_datem[0][1]
+                return se_shodou[0]
         return None
 
     for t in transakce:
         if t.get("Faktura"):
             continue
         castka = _castka_transakce(t)
+        datum_t = _parsuj_datum(str(t.get("Datum", "") or ""))
 
         # 1. VS pole transakce
         vs_t = _normalizuj_vs(t.get("VS"))
         if vs_t and vs_t in vs_mapa:
-            hit = _vyber_vs(vs_mapa[vs_t], castka, vyzaduj_castku=False)
+            hit = _vyber_vs(vs_mapa[vs_t], castka, vyzaduj_castku=False, datum=datum_t)
             if hit:
                 t["Faktura"] = hit
                 t["_predparovano"] = "VS"
@@ -348,7 +385,7 @@ def predparuj(transakce: list[dict], index: dict) -> list[dict]:
         for seq in re.findall(r"\d{4,10}", texty):
             seq_n = seq.lstrip("0")
             if seq_n and seq_n != vs_t and seq_n in vs_mapa:
-                hit = _vyber_vs(vs_mapa[seq_n], castka, vyzaduj_castku=True)
+                hit = _vyber_vs(vs_mapa[seq_n], castka, vyzaduj_castku=True, datum=datum_t)
                 if hit:
                     break
         if hit:
@@ -435,6 +472,15 @@ def kandidati_pro_transakci(
         skore = 0
         duvody = []
 
+        if datum_t and datum_f:
+            dny = abs((datum_t - datum_f).days)
+            if dny <= 2:
+                skore += 2
+                duvody.append("datum sedí (±2 dny)")
+            elif dny <= 7:
+                skore += 1
+                duvody.append("datum blízko (±7 dní)")
+
         fc = meta.get("castka")
         fc = round(float(fc), 2) if fc is not None else None
         cizi_mena = _je_cizi_mena(meta)
@@ -482,3 +528,56 @@ def kandidati_pro_transakci(
 
     vysledky.sort(key=lambda k: -k["skore"])
     return vysledky[:max_kandidatu]
+
+
+# ---------------------------------------------------------------------------
+# Zpětné ověření přiřazení (deterministicky i po AI)
+# ---------------------------------------------------------------------------
+
+def over_prirazeni(transakce: list[dict], index: dict) -> list[dict]:
+    """
+    Poslední pojistka: po přiřazení faktury (deterministicky i AI) ověří, že
+    přiřazení nekoliduje s tvrdými signály z indexu (VS, protiúčet, částka).
+
+    Nejde o to, že by chyběl signál (kartové platby VS/účet nemají – to je
+    normální a nic to neznamená) – jde o to, že DOSTUPNÝ signál JEDNOZNAČNĚ
+    NESEDÍ. To je silný náznak, že přiřazení je chybné (VS kolize bez
+    kontroly částky, halucinace AI, špatně přečtená faktura…) – ale může mít
+    i legitimní vysvětlení (např. částečná platba), proto se přiřazení
+    nemaže, jen se označí varováním do "Check přiřazení faktury" k ruční
+    kontrole.
+    """
+    for t in transakce:
+        fname = t.get("Faktura")
+        if not fname or fname == "NENALEZENO":
+            t["Check přiřazení faktury"] = ""
+            continue
+        meta = index.get(fname)
+        if not meta or meta.get("error"):
+            t["Check přiřazení faktury"] = "⚠ faktura není v indexu"
+            continue
+
+        problemy = []
+
+        vs_t = _normalizuj_vs(t.get("VS"))
+        vs_f = _normalizuj_vs(meta.get("vs"))
+        if vs_t and vs_f and vs_t != vs_f:
+            problemy.append(f"VS transakce ({vs_t}) ≠ VS faktury ({vs_f})")
+
+        protiucet_raw = str(t.get("Číslo protiúčtu", t.get("Protiúčet", "")) or "")
+        zaklad_t = _normalizuj_ucet(protiucet_raw)
+        ucty_f = [_normalizuj_ucet(str(u)) for u in (meta.get("ucty") or [])]
+        if zaklad_t and ucty_f and zaklad_t not in ucty_f:
+            problemy.append(f"účet transakce ({zaklad_t}) není mezi účty faktury ({', '.join(ucty_f)})")
+
+        castka_t = _castka_transakce(t)
+        castka_f = meta.get("castka")
+        if castka_t is not None and castka_f is not None and not _je_cizi_mena(meta):
+            castka_f = round(float(castka_f), 2)
+            odchylka = abs(castka_f - castka_t)
+            if odchylka > max(TOLERANCE_CASTKY * 5, 0.05 * max(castka_f, castka_t)):
+                problemy.append(f"částka transakce ({castka_t}) ≠ částka faktury ({castka_f})")
+
+        t["Check přiřazení faktury"] = ("⚠ " + "; ".join(problemy)) if problemy else ""
+
+    return transakce

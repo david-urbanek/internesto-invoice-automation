@@ -3,7 +3,7 @@ Deterministická kategorizace PŘED voláním AI.
 
 Postaveno na analýze schválených výpisů (leden–květen 2026, 2 492 transakcí):
 zhruba 60 % transakcí má jednoznačný signál, u kterého AI nemá co rozhodovat.
-Transakce zkategorizované tady dostanou Jistota 100 a AI kategorizace
+Transakce zkategorizované tady dostanou Jistota kategorie 100 a AI kategorizace
 (ai.kategorizuj_transakce) je přeskočí – řeší jen zbytek.
 
 Pravidla v pořadí priority:
@@ -60,7 +60,7 @@ def _mapy_pravidel() -> tuple[dict[str, str], dict[str, str], set[str]]:
 
 
 def _protiucet(t: dict) -> str:
-    ucet = (t.get("Číslo protiúčtu") or t.get("Protiúčet") or "").strip()
+    ucet = str(t.get("Číslo protiúčtu") or t.get("Protiúčet") or "").strip()
     # RB/Air Bank exporty mívají formát "číslo/kód banky"
     return ucet.split("/")[0].strip()
 
@@ -70,7 +70,7 @@ def aplikuj_deterministickou_kategorizaci(
     omezene_kategorie: list[str] | None = None,
 ) -> list[dict]:
     """
-    Přiřadí Kategorie + Jistota=100 transakcím s jednoznačným signálem.
+    Přiřadí Kategorie + Jistota kategorie=100 transakcím s jednoznačným signálem.
     Ostatní nechá beze změny (Kategorie nenastaví) – ty půjdou do AI.
     """
     podle_stitku, podle_uctu, deklarovane_ucty = _mapy_pravidel()
@@ -87,7 +87,7 @@ def aplikuj_deterministickou_kategorizaci(
         kategorie = UCET_VZDY_KATEGORIE.get(ucet)
         if kategorie and povolena(kategorie):
             t["Kategorie"] = kategorie
-            t["Jistota"] = 100
+            t["Jistota kategorie"] = 100
             t["Poznamka"] = (
                 f"Deterministicky: protiúčet {ucet} má vždy kategorii "
                 f"'{kategorie}' bez ohledu na štítek."
@@ -98,7 +98,7 @@ def aplikuj_deterministickou_kategorizaci(
         kategorie = podle_stitku.get(stitek) if stitek else None
         if kategorie and povolena(kategorie):
             t["Kategorie"] = kategorie
-            t["Jistota"] = 100
+            t["Jistota kategorie"] = 100
             t["Poznamka"] = f"Deterministicky: štítek '{t.get('Poznámka', '').strip()}'."
             continue
 
@@ -109,7 +109,7 @@ def aplikuj_deterministickou_kategorizaci(
         for marker, kat_marker in VZDY_TEXT_KATEGORIE.items():
             if marker in text and povolena(kat_marker):
                 t["Kategorie"] = kat_marker
-                t["Jistota"] = 100
+                t["Jistota kategorie"] = 100
                 t["Poznamka"] = f"Deterministicky: text obsahuje '{marker}'."
                 break
         if t.get("Kategorie"):
@@ -128,7 +128,7 @@ def aplikuj_deterministickou_kategorizaci(
             if any(abs(abs(castka) - fixni) < 0.01 for fixni in SPLATKY_UVERU[ucet]):
                 if povolena("Splátka"):
                     t["Kategorie"] = "Splátka"
-                    t["Jistota"] = 100
+                    t["Jistota kategorie"] = 100
                     t["Poznamka"] = (
                         f"Deterministicky: fixní splátka úvěru {abs(castka):.2f} "
                         f"na účet {ucet}."
@@ -138,7 +138,7 @@ def aplikuj_deterministickou_kategorizaci(
                 continue  # neznámá částka se zmínkou o splátce – možná refixace, do AI
             if povolena("Převod"):
                 t["Kategorie"] = "Převod"
-                t["Jistota"] = 100
+                t["Jistota kategorie"] = 100
                 t["Poznamka"] = (
                     f"Deterministicky: částka {castka} na úvěrový účet {ucet} "
                     f"neodpovídá fixní splátce → interní přesun peněz."
@@ -148,7 +148,7 @@ def aplikuj_deterministickou_kategorizaci(
         kategorie = podle_uctu.get(ucet)
         if kategorie and povolena(kategorie):
             t["Kategorie"] = kategorie
-            t["Jistota"] = 100
+            t["Jistota kategorie"] = 100
             t["Poznamka"] = f"Deterministicky: protiúčet {ucet} patří jednoznačně kategorii."
             continue
 
@@ -156,7 +156,7 @@ def aplikuj_deterministickou_kategorizaci(
         # Premier, Splátka…) musí rozhodnout AI – tady jen nedeklarované.
         if ucet in FIREMNI_UCTY and ucet not in deklarovane_ucty and povolena("Převod"):
             t["Kategorie"] = "Převod"
-            t["Jistota"] = 100
+            t["Jistota kategorie"] = 100
             t["Poznamka"] = (
                 f"Deterministicky: protiúčet {ucet} je firemní účet "
                 f"({FIREMNI_UCTY[ucet]}) bez jiného signálu → Převod."

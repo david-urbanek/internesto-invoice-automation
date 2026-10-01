@@ -1,6 +1,6 @@
 # Internesto Invoice Automation
 
-Nástroj pro automatickou kategorizaci bankovních transakcí pomocí Gemini AI. Načte CSV výpisy z Fio banky, přiřadí ke každé transakci účetní kategorii a spáruje ji s fakturou ze složky `invoices/`.
+Nástroj pro automatickou kategorizaci bankovních transakcí pomocí Gemini AI. Načte CSV nebo XLSX výpisy z Fio banky, přiřadí ke každé transakci účetní kategorii a spáruje ji s fakturou ze složky `invoices/`.
 
 ## Co to umí
 
@@ -45,9 +45,9 @@ Pro každou firmu vytvoř tuto strukturu pod `firmy/`:
 ```
 firmy/
   NazevFirmy/
-    transactions/     ← CSV výpisy z banky (Fio: Účty → Export)
+    transactions/     ← CSV nebo XLSX výpisy z banky
     invoices/         ← faktury jako PDF, PNG nebo JPG
-    results/          ← sem se ukládají výsledky (generuje se automaticky)
+    results/          ← sem se ukládají výsledky jako CSV
 ```
 
 Příklad pro více firem:
@@ -76,13 +76,13 @@ uv run kategorizace
 
 ## Příkazy
 
-| Příkaz | Co dělá |
-|---|---|
-| `uv run kategorizace` | Spustí kategorizaci všech firem a uloží výsledky do `results/` (zahrnuje i sloupce `Firma`/`Radek`) |
-| `uv run radky` | Přepočítá sloupce `Firma`/`Radek` ve stávajících `results/*.csv` bez volání AI — pro staré výsledky nebo po změně mapování v `config.py` |
-| `uv run report` | Zobrazí transakce bez spárované faktury (kde se faktura očekává) |
-| `uv run konfigurace` | Vypíše tabulku všech kategorií s popisem a typickými dodavateli |
-| `uv run promazat-vypisy` | Smaže obsah `transactions/Prijmove` a `transactions/Vydajove` u všech firem (po zpracování výpisů) — s potvrzením, přeskočit lze `-y` |
+| Příkaz                   | Co dělá                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `uv run kategorizace`    | Spustí kategorizaci všech firem a uloží výsledky do `results/` (zahrnuje i sloupce `Firma`/`Radek`)                                      |
+| `uv run radky`           | Přepočítá sloupce `Firma`/`Radek` ve stávajících `results/*.csv` bez volání AI — pro staré výsledky nebo po změně mapování v `config.py` |
+| `uv run report`          | Zobrazí transakce bez spárované faktury (kde se faktura očekává)                                                                         |
+| `uv run konfigurace`     | Vypíše tabulku všech kategorií s popisem a typickými dodavateli                                                                          |
+| `uv run promazat-vypisy` | Smaže obsah `transactions/Prijmove` a `transactions/Vydajove` u všech firem (po zpracování výpisů) — s potvrzením, přeskočit lze `-y`    |
 
 ## Co se děje při spuštění kategorizace
 
@@ -98,20 +98,21 @@ uv run kategorizace
 
 Výsledný soubor obsahuje všechny původní sloupce z bankovního výpisu a navíc:
 
-| Sloupec | Popis |
-|---|---|
-| `Kategorie` | Přiřazená účetní kategorie |
-| `Faktura` | Název souboru faktury nebo `NENALEZENO` |
-| `Poznamka` | Vysvětlení kategorizace od AI |
-| `Jistota` | Skóre 0–100 (100 = absolutně jisté) |
-| `Firma` | RD / Nesty / Casa / Pokladna, podle složky |
-| `Radek` | ID řádku Alokačního formuláře (`P<n>` příjmy, `N<n>` výdaje, `P00`/`N00` = nenamapováno — viz `docs/pro-klienta/Prehled-kategorizace.pdf`) |
-| `Špatně zvolená kategorie` | Prázdné — pro ruční označení při kontrole výsledků |
-| `Chyba ve faktuře` | Prázdné — pro ruční označení při kontrole výsledků |
+| Sloupec                    | Popis                                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Kategorie`                | Přiřazená účetní kategorie                                                                                                                 |
+| `Faktura`                  | Název souboru faktury nebo `NENALEZENO`                                                                                                    |
+| `Poznamka`                 | Vysvětlení kategorizace od AI                                                                                                              |
+| `Jistota`                  | Skóre 0–100 (100 = absolutně jisté)                                                                                                        |
+| `Firma`                    | RD / Nesty / Casa / Pokladna, podle složky                                                                                                 |
+| `Radek`                    | ID řádku Alokačního formuláře (`P<n>` příjmy, `N<n>` výdaje, `P00`/`N00` = nenamapováno — viz `docs/pro-klienta/Prehled-kategorizace.pdf`) |
+| `Špatně zvolená kategorie` | Prázdné — pro ruční označení při kontrole výsledků                                                                                         |
+| `Chyba ve faktuře`         | Prázdné — pro ruční označení při kontrole výsledků                                                                                         |
 
 ## Kategorie a konfigurace
 
 Všechny kategorie, aliasy a čísla firemních účtů jsou v `src/kategorizace/config.py`. Každá kategorie má:
+
 - `nazev` — název použitý ve výstupu
 - `popis` — popis pro AI
 - `dodavatele` — typická jména protistrany
