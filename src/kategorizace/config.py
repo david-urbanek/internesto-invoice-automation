@@ -134,9 +134,36 @@ KATEGORIE = [
     {
         "nazev": "Ostatní služby",
         "popis": "Různé služby nezařaditelné jinam (callcentrum, pošta, drobné poplatky).",
-        "dodavatele": ["Daktela", "AirWallet", "Česká pošta", "Coma Jurny", "Burda Design"],
-        "protiucty": ["2078745001", "170158265"],
+        "dodavatele": ["AirWallet", "Česká pošta", "Coma Jurny", "Burda Design"],
+        "protiucty": ["170158265"],
         "klicova_slova": ["FAKTURUJEME VAM ZA", "AIRWALLET", "Coma Jurny", "Burda Design"],
+    },
+    {
+        "nazev": "Daktela",
+        "popis": "Cloudové callcentrum / telefonie Daktela (dřív slučováno do 'Ostatní služby'). Dle FA.",
+        "dodavatele": ["Daktela"],
+        "protiucty": ["2078745001"],
+        "klicova_slova": ["Daktela"],
+    },
+    {
+        "nazev": "Appsatori",
+        "popis": "Google Cloud Platform přes resellera Appsatori (štítek 'GCP <měsíc>'). Dle FA.",
+        "dodavatele": ["Appsatori"],
+        "protiucty": ["20356362"],
+        "klicova_slova": ["Appsatori", "GCP"],
+    },
+    {
+        "nazev": "BE-A",
+        "popis": "BE-A Voice – licence/předplatné hlasových služeb (dřív AI 'Ostatní služby'). Dle FA.",
+        "dodavatele": ["BE-A"],
+        "protiucty": ["12173742"],
+        "klicova_slova": ["BE-A"],
+    },
+    {
+        "nazev": "Pricelabs",
+        "popis": "PriceLabs Dynamic Pricing – předplatné dynamické cenotvorby (dřív slučováno do 'Previo systém'). Dle FA.",
+        "dodavatele": ["PriceLabs"],
+        "klicova_slova": ["PriceLabs", "pricelabsinc"],
     },
     {
         "nazev": "Jídlo",
@@ -801,19 +828,19 @@ OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
         # musí být PŘED "2201422348" – "casa prijmovy" je podřetězec
         # "casa prijmovy eur", jinak by CZK záznam EUR soubor předběhl.
         "klicove_slovo": "casa prijmovy eur",
-        "kategorie": ["Ostatní ubytování EUR", "Převod"],
+        "kategorie": ["Ostatní ubytování EUR", "Úrok", "Vratka", "Převod"],
         "vychozi": "Ostatní ubytování EUR",
     },
     "2201422348": {  # Casa Libre s.r.o. | Příjmový 1 CZK (Fio)
         "klicove_slovo": "casa prijmovy",
         # "Mamka nájem" povoleno navíc (08/2026): deterministická platba
         # od Michaely Dančové (protiúčet 1751450015) – viz KATEGORIE_PRIJMOVE.
-        "kategorie": ["Ostatní ubytování CZK", "Převod", "Mamka nájem"],
+        "kategorie": ["Ostatní ubytování CZK", "Úrok", "Vratka", "Převod", "Mamka nájem"],
         "vychozi": "Ostatní ubytování CZK",
     },
     "2301240402": {  # Nesty Services s.r.o. | Příjmový 1 CZK (Fio)
         "klicove_slovo": "nesty prijmovy",
-        "kategorie": ["Ostatní ubytování CZK", "Převod"],
+        "kategorie": ["Ostatní ubytování CZK", "Úrok", "Vratka", "Převod"],
         "vychozi": "Ostatní ubytování CZK",
     },
     # Rozhodnutí uživatele (08/2026): na příjmovém účtu Pokladny je jediná
@@ -823,13 +850,13 @@ OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
     # zachytilo soubor dřív a vrátilo špatný (vylučovací) seznam.
     "POKLADNA_PRIJMOVY": {
         "klicove_slovo": "pokladna prijmov",
-        "kategorie": ["Hotovost"],
+        "kategorie": ["Hotovost", "Úrok", "Vratka"],
     },
     "2901321222": {  # RD Group s.r.o. | Ostatní CZK (Fio)
         # POZOR: klíčové slovo musí obsahovat i firmu – samotné "ostatni" by
         # chytalo i "Nesty Ostatní", který uzavřený seznam mít nesmí.
         "klicove_slovo": "rd ostatni",
-        "kategorie": ["Benzín", "Výdaje majitele", "Převod"],
+        "kategorie": ["Benzín", "Výdaje majitele", "Úrok", "Vratka", "Převod"],
     },
     "POKLADNA_HOTOVOST": {  # hotovostní pokladna – bez čísla účtu
         "klicove_slovo": "pokladna",
@@ -935,8 +962,9 @@ SPLATKY_UVERU: dict[str, list[float]] = {
 # case-insensitive) → kategorie, která platí VŽDY – ať jde o nákup (mínus),
 # nebo vratku/refundaci (plus). Viz aplikuj_vzdy_dodavatel() v prepisy.py.
 VZDY_DODAVATEL_KATEGORIE: dict[str, str] = {
-    # PriceLabs Dynamic Pricing je předplatné systému Previo.
-    "pricelabsinc*dynaprice": "Previo systém",
+    # Rozhodnutí uživatele (10/2026): PriceLabs Dynamic Pricing má vlastní
+    # kategorii i řádek ve formuláři (dřív slučováno do "Previo systém").
+    "pricelabsinc*dynaprice": "Pricelabs",
     "alza": "Dekorace",
     "silmet": "Benzín",
     "zerogas": "Benzín",
@@ -1051,6 +1079,16 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     "Prádelna": "N68",
     "Ostatní služby": "N70",
     "Netflix a Spotify": "N71",
+
+    # --- Výdaje: samostatné dodavatelské služby, vlastní řádek (10/2026) ---
+    # Rozhodnutí uživatele (10/2026): odštěpeno ze sběrných kategorií na
+    # vlastní řádky. ID N74–N77 nutno vytvořit v entity listech
+    # 2026 Alokační formulář.xlsx (ID sloupec C), viz
+    # docs/napojeni-na-alokacni-formular.md.
+    "Pricelabs": "N74",   # dřív součást "Previo systém" (N45)
+    "Daktela": "N75",     # dřív součást "Ostatní služby" (N70)
+    "Appsatori": "N76",   # dřív nenamapováno (N00)
+    "BE-A": "N77",        # dřív AI "Ostatní služby" (N70)
 
     # --- Vědomě bez řádku (interní toky) ---------------------------------
     "Převod": None,

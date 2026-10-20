@@ -74,16 +74,39 @@ from .config import (
 
 _KATEGORIE_PRIJMOVE_NAZVY = {k["nazev"] for k in KATEGORIE_PRIJMOVE}
 
+# Poznámka, kterou deterministika.py zapisuje u kategorizace podle ručního
+# štítku. Slouží i jako signál pro aplikuj_interni_prevod, že kategorii určil
+# explicitní lidský štítek (viz docstring tamtéž).
+POZNAMKA_STITEK_PREFIX = "Deterministicky: štítek"
+
+
+def _protiucet(t: dict) -> str:
+    """Číslo protiúčtu bez kódu banky.
+
+    RB/Air Bank/Raiffeisen exporty mívají protiúčet ve formátu
+    „číslo/kód banky" (např. „2200973033/5500"). FIREMNI_UCTY i protiucty
+    v configu jsou vedené jen holým číslem, takže se musí stejně jako
+    v deterministika._protiucet odseknout vše za „/", jinak by se interní
+    převod na firemní účet na takovém výpisu nerozpoznal.
+    """
+    ucet = str(t.get("Číslo protiúčtu") or t.get("Protiúčet") or "").strip()
+    return ucet.split("/")[0].strip()
+
 
 def aplikuj_interni_prevod(transakce: list[dict]) -> list[dict]:
     """
     Přepíše kategorii na "Převod" u transakcí, jejichž protiúčet je interní
     účet skupiny (FIREMNI_UCTY).
 
-    Výjimka: pokud AI přiřadila kategorii, která tento protiúčet sama
-    deklaruje v configu (Splátka → úvěrové účty MONETA, Výplata majitele →
-    účty Radka Danče, Kotlářská → Casa Příjmový…), kategorie zůstává –
-    jde o záměrně zvlášť sledovaný interní tok, ne o obyčejný přesun peněz.
+    Výjimky, kdy kategorie zůstává (nejde o obyčejný přesun peněz):
+      - kategorie sama tento protiúčet deklaruje v configu (Splátka → úvěrové
+        účty MONETA, Výplata majitele → účty Radka Danče, Kotlářská → Casa
+        Příjmový…) – jde o záměrně zvlášť sledovaný interní tok;
+      - kategorii určil explicitní ruční štítek (deterministika.py, poznámka
+        začíná POZNAMKA_STITEK_PREFIX). Ruční štítek je nejspolehlivější signál,
+        jaký máme, a má přednost i před firemním protiúčtem (rozhodnutí
+        uživatele 10/2026) – např. tankování placené mezi vlastními účty se
+        štítkem „Benzín" zůstává „Benzín", ne „Převod".
     """
     povolene_kategorie: dict[str, set[str]] = {}
     for k in KATEGORIE + KATEGORIE_PRIJMOVE:
@@ -91,13 +114,17 @@ def aplikuj_interni_prevod(transakce: list[dict]) -> list[dict]:
             povolene_kategorie.setdefault(ucet.strip(), set()).add(k["nazev"])
 
     for t in transakce:
-        protiucet = (t.get("Číslo protiúčtu") or t.get("Protiúčet") or "").strip()
+        protiucet = _protiucet(t)
         if not protiucet or protiucet not in FIREMNI_UCTY:
             continue
         kategorie = t.get("Kategorie", "")
-        if kategorie == "Převod" or kategorie in povolene_kategorie.get(protiucet, set()):
-            continue
         puvodni_poznamka = t.get("Poznamka", "")
+        if (
+            kategorie == "Převod"
+            or kategorie in povolene_kategorie.get(protiucet, set())
+            or puvodni_poznamka.startswith(POZNAMKA_STITEK_PREFIX)
+        ):
+            continue
         t["Kategorie"] = "Převod"
         t["Poznamka"] = (
             f"{puvodni_poznamka} Přepsáno z '{kategorie}' na 'Převod' – protiúčet "
@@ -214,7 +241,11 @@ def aplikuj_vychozi_kategorii_ucet(
             # "Mamka nájem" (deterministika.py, protiúčet 1751450015) je
             # záměrně jiná kategorie než "vychozi" – soukromá platba od
             # Michaely Dančové, ne příjem firmy z ubytování.
-            if kategorie in (vychozi, "Převod", "Mamka nájem"):
+            # "Úrok" a "Vratka" (08/2026) jsou povolené i na příjmových
+            # účtech (kreditní úrok z bankovního zůstatku, resp. vrácení
+            # platby hostovi) – viz OMEZENE_KATEGORIE_PODLE_UCTU, nesmí je
+            # přepsat na "vychozi".
+            if kategorie in (vychozi, "Převod", "Mamka nájem", "Úrok", "Vratka"):
                 continue
             puvodni_poznamka = t.get("Poznamka", "")
             t["Kategorie"] = vychozi
@@ -388,7 +419,7 @@ def aplikuj_prevod_zpetna_platba(transakce: list[dict]) -> list[dict]:
     """
     skupiny_podle_uctu: dict[str, list[dict]] = defaultdict(list)
     for t in transakce:
-        protiucet = (t.get("Číslo protiúčtu") or t.get("Protiúčet") or "").strip()
+        protiucet = _protiucet(t)
         if protiucet:
             skupiny_podle_uctu[protiucet].append(t)
 
@@ -426,7 +457,7 @@ def aplikuj_telefony_nejvyssi_castka(transakce: list[dict]) -> list[dict]:
     """
     tmobile = [
         t for t in transakce
-        if (t.get("Číslo protiúčtu") or t.get("Protiúčet") or "").strip() == UCET_TMOBILE
+        if _protiucet(t) == UCET_TMOBILE
         and t.get("Kategorie") in ("Telefony", "Zvláštní výdaj")
     ]
 

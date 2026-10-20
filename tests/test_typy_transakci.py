@@ -7,10 +7,14 @@ import unittest
 from openpyxl import Workbook
 
 from kategorizace.ai import kategorizuj_transakce
-from kategorizace.config import MAPOVANI_NA_FORMULAR
+from kategorizace.config import KATEGORIE, KATEGORIE_PRIJMOVE, MAPOVANI_NA_FORMULAR
 from kategorizace.deterministika import aplikuj_deterministickou_kategorizaci
 from kategorizace.io import nacti_xlsx
-from kategorizace.prepisy import aplikuj_jmena_pokladna, aplikuj_vzdy_dodavatel
+from kategorizace.prepisy import (
+    aplikuj_interni_prevod,
+    aplikuj_jmena_pokladna,
+    aplikuj_vzdy_dodavatel,
+)
 
 
 class _FakeClient:
@@ -90,13 +94,36 @@ class TransactionValueTypeTests(unittest.TestCase):
         self.assertEqual([row.get("Kategorie") for row in result], ["Úrok", "Úrok"])
         self.assertEqual(MAPOVANI_NA_FORMULAR["Úrok"], "N49")
 
-    def test_pricelabs_merchant_is_previo_system(self):
+    def test_pricelabs_merchant_has_own_category_and_row(self):
         result = aplikuj_vzdy_dodavatel(
             [{"Název protiúčtu": "PRICELABSINC*DYNAPRICE"}]
         )
 
-        self.assertEqual(result[0].get("Kategorie"), "Previo systém")
-        self.assertEqual(MAPOVANI_NA_FORMULAR["Previo systém"], "N45")
+        self.assertEqual(result[0].get("Kategorie"), "Pricelabs")
+        self.assertEqual(MAPOVANI_NA_FORMULAR["Pricelabs"], "N74")
+
+    def test_split_service_vendors_have_own_category_and_row(self):
+        # Daktela/Appsatori/BE-A dostaly 10/2026 vlastní kategorii i řádek
+        # místo sběrného "Ostatní služby"/nenamapováno. Protiúčet je
+        # deterministický signál, štítek jen potvrzuje.
+        cases = [
+            ("2078745001", "Daktela", "N75"),
+            ("20356362", "Appsatori", "N76"),
+            ("12173742", "BE-A", "N77"),
+        ]
+        for protiucet, kategorie, radek in cases:
+            with self.subTest(kategorie=kategorie):
+                rows = [{"Číslo protiúčtu": protiucet, "Poznámka": ""}]
+                aplikuj_deterministickou_kategorizaci(rows)
+                self.assertEqual(rows[0].get("Kategorie"), kategorie)
+                self.assertEqual(MAPOVANI_NA_FORMULAR[kategorie], radek)
+
+    def test_daktela_removed_from_ostatni_sluzby(self):
+        # Protiúčet Daktely se nesmí zároveň hlásit k "Ostatní služby",
+        # jinak by deterministika měla dvě kategorie a signál by zahodila.
+        ostatni = next(k for k in KATEGORIE if k["nazev"] == "Ostatní služby")
+        self.assertNotIn("2078745001", ostatni.get("protiucty", []))
+        self.assertNotIn("Daktela", ostatni.get("dodavatele", []))
 
     def test_new_cleaning_people_apply_only_to_pokladna(self):
         pokladna = [
@@ -127,6 +154,44 @@ class TransactionValueTypeTests(unittest.TestCase):
             [row.get("Kategorie") for row in result],
             ["Převod", "B53", "A43"],
         )
+
+    def test_internal_transfer_with_bank_code_on_income_statement(self):
+        # Příjmový výpis: uzavřený seznam kategorií neobsahuje "Převod", takže
+        # deterministika ani AI ho přiřadit nesmí – interní převod na firemní
+        # účet musí dorovnat až aplikuj_interni_prevod. Na Raiffeisen výpisu
+        # má protiúčet příponu "/kód banky"; override ji musí normalizovat,
+        # jinak řádek zůstane "Neurčeno" (regrese z 10/2026).
+        prijmove = [k["nazev"] for k in KATEGORIE_PRIJMOVE]
+        self.assertNotIn("Převod", prijmove)
+        rows = [{"Číslo protiúčtu": "2200973033/2010", "Objem": "15000"}]
+
+        aplikuj_deterministickou_kategorizaci(rows, prijmove)
+        self.assertIsNone(rows[0].get("Kategorie"))  # na příjmovém výpisu nesahá
+
+        rows[0]["Kategorie"] = "Neurčeno"  # stav po AI omezené na příjmové kategorie
+        aplikuj_interni_prevod(rows)
+
+        self.assertEqual(rows[0].get("Kategorie"), "Převod")
+
+    def test_manual_label_keeps_category_over_internal_transfer(self):
+        # Ruční štítek je nejspolehlivější signál a má přednost i před firemním
+        # protiúčtem (rozhodnutí uživatele 10/2026). Tankování placené mezi
+        # vlastními účty se štítkem „Benzín" musí zůstat „Benzín", ne „Převod".
+        stitek = [{"Poznámka": "Benzín", "Číslo protiúčtu": "2200973033", "Objem": "-3100"}]
+        aplikuj_deterministickou_kategorizaci(stitek)
+        self.assertEqual(stitek[0]["Kategorie"], "Benzín")
+        aplikuj_interni_prevod(stitek)
+        self.assertEqual(stitek[0]["Kategorie"], "Benzín")
+
+        # Kontrola: kategorie od AI (bez štítkové poznámky) se stále přepíše.
+        ai = [{
+            "Číslo protiúčtu": "2200973033",
+            "Kategorie": "Benzín",
+            "Poznamka": "AI: tankování",
+        }]
+        aplikuj_interni_prevod(ai)
+        self.assertEqual(ai[0]["Kategorie"], "Převod")
+
 
 if __name__ == "__main__":
     unittest.main()

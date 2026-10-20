@@ -37,7 +37,7 @@ from .config import (
     UCET_VZDY_KATEGORIE,
     VZDY_TEXT_KATEGORIE,
 )
-from .prepisy import _parsuj_castku
+from .prepisy import POZNAMKA_STITEK_PREFIX, _parsuj_castku, _protiucet
 
 
 def _mapy_pravidel() -> tuple[dict[str, str], dict[str, str], set[str]]:
@@ -57,12 +57,6 @@ def _mapy_pravidel() -> tuple[dict[str, str], dict[str, str], set[str]]:
             deklarace.setdefault(ucet.strip(), set()).add(k["nazev"])
     podle_uctu = {u: next(iter(kat)) for u, kat in deklarace.items() if len(kat) == 1}
     return podle_stitku, podle_uctu, set(deklarace)
-
-
-def _protiucet(t: dict) -> str:
-    ucet = str(t.get("Číslo protiúčtu") or t.get("Protiúčet") or "").strip()
-    # RB/Air Bank exporty mívají formát "číslo/kód banky"
-    return ucet.split("/")[0].strip()
 
 
 def aplikuj_deterministickou_kategorizaci(
@@ -99,7 +93,7 @@ def aplikuj_deterministickou_kategorizaci(
         if kategorie and povolena(kategorie):
             t["Kategorie"] = kategorie
             t["Jistota kategorie"] = 100
-            t["Poznamka"] = f"Deterministicky: štítek '{t.get('Poznámka', '').strip()}'."
+            t["Poznamka"] = f"{POZNAMKA_STITEK_PREFIX} '{t.get('Poznámka', '').strip()}'."
             continue
 
         text = " ".join(
