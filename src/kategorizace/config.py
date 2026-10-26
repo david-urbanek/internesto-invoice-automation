@@ -415,23 +415,18 @@ KATEGORIE = [
         "protiucty": ["10014-1703621", "2110568392"],
         "klicova_slova": ["energie", "plyn", "V14", "nedoplatek"],
     },
-    # POZN.: Prostory a Snídaně dřív deklarovaly protiúčet 2301240402 (Nesty
-    # Příjmový). Dle rozhodnutí uživatele (07/2026) platby na interní účet
-    # patří do "Převod" – protiúčet odstraněn, aby je aplikuj_interni_prevod
-    # přepsal; kategorie zůstávají pro případy rozpoznané štítkem/klíč. slovem.
+    # POZN.: Prostory dřív deklarovala protiúčet 2301240402 (Nesty Příjmový).
+    # Dle rozhodnutí uživatele (07/2026) platby na interní účet patří do
+    # "Převod" – protiúčet odstraněn, aby je aplikuj_interni_prevod přepsal;
+    # kategorie zůstává pro případy rozpoznané štítkem/klíč. slovem.
+    # (Snídaně přesunuta do KATEGORIE_PRIJMOVE jako "Snídaně Výdaj" –
+    # rozhodnutí uživatele 10/2026, viz tam.)
     {
         "nazev": "Prostory",
         "popis": "Nájem prostor sloužících podnikání (Nesty – X.01, E03, E09). Dle smlouvy.",
         "dodavatele": [],
         "protiucty": [],
         "klicova_slova": ["prostor", "Prostory"],
-    },
-    {
-        "nazev": "Snídaně",
-        "popis": "Náklady na snídaně pro hosty. Dle FA.",
-        "dodavatele": [],
-        "protiucty": [],
-        "klicova_slova": ["Snidane", "snídan"],
     },
     {
         "nazev": "A43",
@@ -618,14 +613,14 @@ KATEGORIE_BEZ_FAKTURY: set[str] = {
     "FU", "Socka", "Zdravka", "DPH",
     # Nájmy a trvalé příkazy dle smlouvy
     "V14 nájem", "V14 energie", "V19", "Kotlářská", "Šremer",
-    "Prostory", "Snídaně", "A43", "B53", "A63", "A73", "A82",
+    "Prostory", "Snídaně Výdaj", "A43", "B53", "A63", "A73", "A82",
     # Splátky úvěrů
     "Splátka", "Úrok",
     # Interní převody a rezervy
     "Převod",
     "Parkování", "Popelnice", "Ubytovací poplatky", "Rezervní 1", "Rezervní 2", "Rezervní 3",
     # Hosté a příjmy
-    "Kauce", "Vratka", "Airbnb",
+    "Kauce", "Vratka", "Airbnb", "Snídaně Příjem",
     # Osobní výdaje majitele (nepatří do firemních výdajů)
     "Výdaje majitele", "Benzín",
     # Pokuty, poplatky a hotovostní operace pokladny
@@ -684,6 +679,8 @@ ALIASY: dict[str, str] = {
     "Premier": "Převod",
     "Banka": "Převod", "Radek - banka": "Převod", "Výdaj Premier": "Převod",
     "Ostatní ubytování/služby": "Ostatní ubytování CZK",
+    # historické štítky bývalé kategorie "Snídaně" (přejmenováno 10/2026)
+    "Snídaně": "Snídaně Výdaj", "Snidane": "Snídaně Výdaj",
 }
 
 KATEGORIE_PRIJMOVE = [
@@ -766,7 +763,67 @@ KATEGORIE_PRIJMOVE = [
         "protiucty": ["1751450015"],
         "klicova_slova": [],
     },
+    # Výdajová kategorie (mapuje se na N59), ale reálně chodí přes PŘÍJMOVÉ
+    # účty jako mezifiremní fakturace snídaní pro hosty placená z příjmového
+    # účtu (např. RD Příjmový 1 → protiúčet Nesty Příjmový). Částka je
+    # variabilní, takže se nedá odlišit deterministicky – rozhoduje AI/štítek
+    # a interní-převod přepis ji NEPŘEPÍŠE na "Převod" (viz
+    # KATEGORIE_PREZIJI_INTERNI_PREVOD). Rozhodnutí uživatele 10/2026.
+    {
+        "nazev": "Snídaně Výdaj",
+        "popis": "Náklady na snídaně pro hosty – mezifiremní fakturace placená "
+                 "z příjmového účtu. Dle FA. VÝDAJ (řádek N59), ne příjem.",
+        "dodavatele": [],
+        "protiucty": [],
+        "klicova_slova": ["Snidane", "snídan"],
+    },
+    # Příjmová strana snídaní pro hosty (zrcadlo "Snídaně Výdaj"): Nesty
+    # fakturuje snídaně a dostává platbu na příjmový účet. Částka je variabilní
+    # a protiúčet (RD Příjmový 2200973033) je sdílený s běžnými interními
+    # převody, takže se to NEDÁ odlišit deterministicky – rozhoduje AI/štítek
+    # ("snidane"). Proto je na účtu Nesty Příjmový z uzavřeného seznamu
+    # (OMEZENE_KATEGORIE_PODLE_UCTU) odebrán "Převod" – deterministika pak
+    # 2200973033 nezafixuje na "Převod" a skutečné převody dorovná až
+    # aplikuj_interni_prevod (stejný vzor jako folder-split příjmové účty).
+    # Kategorie přežije interní-převod/výchozí přepis přes
+    # KATEGORIE_PREZIJI_INTERNI_PREVOD. Mapuje se na nový příjmový řádek P18
+    # "Snídaně". Rozhodnutí uživatele 10/2026.
+    {
+        "nazev": "Snídaně Příjem",
+        "popis": "Tržby za snídaně pro hosty – mezifiremní fakturace přijatá "
+                 "na příjmový účet (Nesty). PŘÍJEM (řádek P18), ne výdaj.",
+        "dodavatele": [],
+        "protiucty": [],
+        "klicova_slova": ["Snidane", "snídan"],
+    },
+    # Příjmová strana nájmu prostor (zrcadlo výdajové "Prostory", řádek P4):
+    # firma skupiny RD platí za prostory X.01/E03/E09 na příjmový účet Nesty.
+    # PŘIŘAZUJE SE DETERMINISTICKY (prepisy.aplikuj_prostory_nesty_prijmovy):
+    # Nesty Příjmový + protiúčet z RD + text "prostor". AI ji NEnabízíme (není
+    # v uzavřeném seznamu Nesty ani v klíčových slovech), aby neplela běžné
+    # ubytování ("Pronajem prostor" od externích hostů = Ostatní ubytování).
+    # Přežije interní-převod/výchozí přepis přes KATEGORIE_PREZIJI_INTERNI_PREVOD.
+    {
+        "nazev": "Prostory Příjem",
+        "popis": "Tržby z nájmu prostor sloužících podnikání (X.01, E03, E09) od "
+                 "firem skupiny RD. PŘÍJEM (řádek P4). Přiřazuje se automaticky "
+                 "na Nesty Příjmový podle protiúčtu z RD – ne přes AI.",
+        "dodavatele": [],
+        "protiucty": [],
+        "klicova_slova": [],
+    },
 ]
+
+# ---------------------------------------------------------------------------
+# Výdajové kategorie, které přežijí přepis na "Převod"/výchozí
+# ---------------------------------------------------------------------------
+# Kategorie vedené přes firemní protiúčet, které ale NEJSOU interní převod.
+# aplikuj_interni_prevod ani aplikuj_vychozi_kategorii_ucet je nesmí přepsat
+# na "Převod"/výchozí kategorii účtu. Např. "Snídaně Výdaj" – mezifiremní
+# fakturace snídaní pro hosty placená z příjmového účtu; částka je variabilní,
+# takže se nedá odlišit deterministicky, rozhodne AI/štítek a tahle kategorie
+# zůstane (důvod je vždy v Poznámce). Rozhodnutí uživatele 10/2026.
+KATEGORIE_PREZIJI_INTERNI_PREVOD: set[str] = {"Snídaně Výdaj", "Snídaně Příjem", "Prostory Příjem"}
 
 # ---------------------------------------------------------------------------
 # Přepis kategorie 'Jídlo' podle karty (sloupec "Provedl") – účet Nesty Ostatní
@@ -782,7 +839,7 @@ UCET_NESTY_OSTATNI = "2301780716"
 # Ověřeno na schválené historii: karetní nákupy Danče v těchto kategoriích
 # jsou VŽDY osobní útrata. Benzín a Reprezentace se NEpřepisují – tam má
 # Danč i legitimní firemní/vlastní kategorie (tankování, pohoštění).
-KATEGORIE_PREPIS_PODLE_PROVEDL: set[str] = {"Jídlo", "Drogerie", "Snídaně"}
+KATEGORIE_PREPIS_PODLE_PROVEDL: set[str] = {"Jídlo", "Drogerie", "Snídaně Výdaj"}
 
 # Podřetězec ve sloupci "Provedl" (hledá se case-insensitive) → nová kategorie.
 # Aplikuje se JEN pokud AI transakci nejdřív zařadila do některé z kategorií
@@ -828,19 +885,26 @@ OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
         # musí být PŘED "2201422348" – "casa prijmovy" je podřetězec
         # "casa prijmovy eur", jinak by CZK záznam EUR soubor předběhl.
         "klicove_slovo": "casa prijmovy eur",
-        "kategorie": ["Ostatní ubytování EUR", "Úrok", "Vratka", "Převod"],
+        "kategorie": ["Ostatní ubytování EUR", "Airbnb", "Úrok", "Vratka", "Převod"],
         "vychozi": "Ostatní ubytování EUR",
     },
     "2201422348": {  # Casa Libre s.r.o. | Příjmový 1 CZK (Fio)
         "klicove_slovo": "casa prijmovy",
         # "Mamka nájem" povoleno navíc (08/2026): deterministická platba
         # od Michaely Dančové (protiúčet 1751450015) – viz KATEGORIE_PRIJMOVE.
-        "kategorie": ["Ostatní ubytování CZK", "Úrok", "Vratka", "Převod", "Mamka nájem"],
+        "kategorie": ["Ostatní ubytování CZK", "Airbnb", "Úrok", "Vratka", "Převod", "Mamka nájem"],
         "vychozi": "Ostatní ubytování CZK",
     },
     "2301240402": {  # Nesty Services s.r.o. | Příjmový 1 CZK (Fio)
         "klicove_slovo": "nesty prijmovy",
-        "kategorie": ["Ostatní ubytování CZK", "Úrok", "Vratka", "Převod"],
+        # "Převod" záměrně NENÍ v seznamu (10/2026): protiúčet 2200973033
+        # (RD Příjmový) nese jak interní převody, tak příjem za snídaně
+        # ("Snídaně Příjem") a částka je variabilní. Bez "Převod" v nabídce
+        # deterministika 2200973033 nezafixuje na "Převod" a nechá rozhodnout
+        # AI; skutečné převody dorovná aplikuj_interni_prevod (firemní účet).
+        # "Prostory Příjem" tu NENÍ – přiřazuje ho deterministicky
+        # aplikuj_prostory_nesty_prijmovy (protiúčet z RD + text "prostor").
+        "kategorie": ["Ostatní ubytování CZK", "Airbnb", "Úrok", "Vratka", "Snídaně Příjem"],
         "vychozi": "Ostatní ubytování CZK",
     },
     # Rozhodnutí uživatele (08/2026): na příjmovém účtu Pokladny je jediná
@@ -878,6 +942,10 @@ OMEZENE_KATEGORIE_PODLE_UCTU: dict[str, dict] = {
 # aplikuj_kotlarska_pronajem_bytu() v prepisy.py.
 UCET_RD_PRIJMOVY = "2200973033"
 KLICOVA_SLOVA_KOTLARSKA_RD_PRIJMOVY: list[str] = ["pronajem bytu"]
+UCET_NESTY_PRIJMOVY = "2301240402"
+# Účty firmy RD Group (z FIREMNI_UCTY) – signál pro aplikuj_prostory_nesty_prijmovy:
+# příchozí platba na Nesty Příjmový z RD účtu + text "prostor" = Prostory Příjem.
+RD_UCTY: set[str] = {u for u, label in FIREMNI_UCTY.items() if label.startswith("RD Group")}
 
 # ---------------------------------------------------------------------------
 # Přepis kategorie 'Telefony' – jen nejvyšší platba T-Mobile je "Telefony"
@@ -1010,6 +1078,13 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     # Rozhodnutí uživatele (08/2026): "Příjem energie" sdílí řádek P16
     # "Ostatní příjmy".
     "Příjem energie": "P16",
+    # Nový příjmový řádek P18 "Snídaně" (10/2026): příjmová strana snídaní,
+    # protějšek výdajové "Snídaně Výdaj" (N59).
+    "Snídaně Příjem": "P18",
+    # Prostory Příjem sdílí řádek P4 s "Ostatní ubytování CZK" (10/2026):
+    # příjmová strana nájmu prostor; rozhodne AI podle Poznámky, přežívá
+    # interní-převod/výchozí přepis přes KATEGORIE_PREZIJI_INTERNI_PREVOD.
+    "Prostory Příjem": "P4",
     # Rozhodnutí uživatele (08/2026): "Mamka nájem" (soukromá platba od
     # Michaely Dančové, ne příjem firmy) nemá ve formuláři protějšek vůbec.
     "Mamka nájem": None,
@@ -1049,10 +1124,8 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     "Ubytovací poplatky": "N33",  # sloučená buňka, ne vlastní N37
     "Poplatek": "N33",  # sloučená buňka, ne vlastní N38
     "Arteon": "N39",
-    # Řádky 40-41 (Auto - Benzín / Výdaje majitel) jsou taky sloučené do
-    # jedné datové buňky na řádku 40 (ověřeno stejným způsobem).
     "Benzín": "N40",
-    "Výdaje majitele": "N40",  # sloučená buňka, ne vlastní N41
+    "Výdaje majitele": "N41",
     "Splátka": "N42",  # TODO klient: řádek 43 "Splátky Raiffeisen" bez jasného protějšku
     "Internet": "N44",
     "Previo systém": "N45",
@@ -1068,7 +1141,7 @@ MAPOVANI_NA_FORMULAR: dict[str, str | dict | None] = {
     "Socka": "N56",
     "Zdravka": "N57",
     "FU": "N58",
-    "Snídaně": "N59",
+    "Snídaně Výdaj": "N59",
     "Taxi": "N60",
     "Popelnice": "N61",
     "Jídlo": "N62",

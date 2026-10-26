@@ -45,6 +45,7 @@ from .prepisy import (
     aplikuj_jidlo_pokladna,
     aplikuj_jmena_pokladna,
     aplikuj_kotlarska_pronajem_bytu,
+    aplikuj_prostory_nesty_prijmovy,
     aplikuj_pradlo_pokladna,
     aplikuj_prevod_zpetna_platba,
     aplikuj_telefony_nejvyssi_castka,
@@ -84,23 +85,39 @@ def _najdi_sloupec(hdr: list, *varianty: str) -> int | None:
 def nacti_vypis_xlsx(cesta: str) -> tuple[list[dict], list[str]]:
     """
     Vrátí (transakce ve formátu pro pipeline, lidské kategorie per řádek).
-    Kategorie = POSLEDNÍ sloupec s hlavičkou Poznámka/Poznámky, pipeline
-    ji nikdy nedostane.
+
+    Dva podporované tvary Excelu:
+      1. Surový výpis + lidská kategorie v POSLEDNÍM sloupci Poznámka/Poznámky.
+      2. Revidovaný VÝSTUP pipeline (sloupce "Kategorie" + "Chyba v kategorii"):
+         pravda = "Chyba v kategorii", pokud je to platná kategorie (lidská
+         oprava); jinak (prázdno / "Neurčeno") platí "Kategorie". Umožňuje
+         backtest proti schváleným výsledkům.
+    Lidská kategorie se pipeline nikdy neposkytuje.
     """
     wb = openpyxl.load_workbook(cesta, read_only=True, data_only=True)
     ws = wb.worksheets[0]
     rows = ws.iter_rows(values_only=True)
     hdr = list(next(rows))
 
+    # "Kategorie" se musí trefit PŘESNĚ – "Jistota kategorie" i "Chyba
+    # v kategorii" obsahují slovo "kategorie" jako podřetězec.
+    i_kat = next((i for i, h in enumerate(hdr)
+                  if h is not None and _bez_diakritiky(h) == "kategorie"), None)
+    i_chyba = next((i for i, h in enumerate(hdr)
+                    if h is not None and _bez_diakritiky(h)
+                    in ("chyba v kategorii", "spatne zvolena kategorie")), None)
+
     poznamky = [
         i for i, h in enumerate(hdr)
         if h is not None and _bez_diakritiky(h) in ("poznamka", "poznamky", "poznmka", "poznmky")
     ]
-    if not poznamky:
+    if i_kat is None and not poznamky:
         wb.close()
-        raise ValueError(f"nenalezen sloupec kategorie (Poznámka): {hdr}")
-    kat_idx = poznamky[-1]
-    i_stitek = poznamky[0] if len(poznamky) > 1 else None
+        raise ValueError(f"nenalezen sloupec kategorie (Kategorie/Poznámka): {hdr}")
+    kat_idx = None if i_kat is not None else poznamky[-1]
+    # štítek = první "Poznámka" (zpráva výpisu); u surového tvaru s jediným
+    # sloupcem Poznámka je ten sloupec kategorie, ne štítek.
+    i_stitek = poznamky[0] if poznamky and (i_kat is not None or len(poznamky) > 1) else None
 
     # varianty "uslo kttu…"/"sstka…"/"nszev…" jsou Air Bank hlavičky
     # s rozbitým kódováním po ASCII-foldu (viz _bez_diakritiky)
@@ -111,6 +128,7 @@ def nacti_vypis_xlsx(cesta: str) -> tuple[list[dict], list[str]]:
     i_objem = _najdi_sloupec(hdr, "objem", "zauctovana castka", "castka v mene uctu",
                              "prijem/vydej", "sstka v mznz")
     i_zprava = _najdi_sloupec(hdr, "zprava pro prijemce", "zprava", "popis")
+    i_typ = _najdi_sloupec(hdr, "typ transakce", "typ")
     i_datum = _najdi_sloupec(hdr, "datum")
     i_vs = _najdi_sloupec(hdr, "vs")
     i_provedl = _najdi_sloupec(hdr, "provedl", "uzivatel", "uivatel")
@@ -134,22 +152,30 @@ def nacti_vypis_xlsx(cesta: str) -> tuple[list[dict], list[str]]:
             "Protiúčet": g(i_protiucet).split("/")[0],
             "Název protiúčtu": g(i_nazev),
             "Zpráva pro příjemce": g(i_zprava),
+            "Typ transakce": g(i_typ),
             "Poznámka": g(i_stitek),
             "VS": g(i_vs),
             "Provedl": g(i_provedl),
         })
-        lidske.append(g(kat_idx))
+        if i_kat is not None:
+            # revidovaný výstup: oprava v "Chyba v kategorii" má přednost, pokud
+            # je to platná kategorie; "Neurčeno"/prázdno → platí "Kategorie".
+            chyba = g(i_chyba) if i_chyba is not None else ""
+            lidske.append(chyba if chyba and normalizuj_lidskou(chyba) else g(i_kat))
+        else:
+            lidske.append(g(kat_idx))
     wb.close()
     return transakce, lidske
 
 
 def firma_ze_souboru(nazev: str) -> str:
+    # podřetězec, ne startswith – názvy mají prefix data ("09-2026-casa-…")
     n = _bez_diakritiky(nazev)
-    if n.startswith("nesty"):
+    if "nesty" in n:
         return "Nesty"
-    if n.startswith("casa"):
+    if "casa" in n:
         return "Casa"
-    if n.startswith("pokladna"):
+    if "pokladna" in n:
         return "Pokladna"
     return "RD"  # RD, RB RD, Airbank, Radek FO
 
@@ -184,6 +210,7 @@ def vyhodnot_vypis(cesta: str, mesic: str, client: genai.Client) -> dict:
     kategorizuj_transakce(transakce, [], client, firma_index=None, omezene_kategorie=omezene)
     aplikuj_interni_prevod(transakce)
     aplikuj_kotlarska_pronajem_bytu(transakce, nazev, firma)
+    aplikuj_prostory_nesty_prijmovy(transakce, nazev, firma)
     aplikuj_jidlo_podle_provedl(transakce, nazev, firma)
     aplikuj_pradlo_pokladna(transakce, firma)
     aplikuj_jmena_pokladna(transakce, firma)

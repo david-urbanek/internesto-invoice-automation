@@ -38,6 +38,7 @@ pro příjmovou transakci, takže alias nic nerozbije).
 | `Ostatní ubytování EUR` | zahraniční platby (SK/jiné IBAN) na EUR účet firmy, rozhoduje klíčové slovo "Ubytování" — protiúčet se neopakuje, plátci jsou různí (např. zahraniční školy). Na Casa Příjmový 1 EUR (`2401780748`) jediná povolená kategorie | **P6** |
 | `Ostatní příjmy` | drobné příchozí refundace od dodavatelů (např. Alza, protiúčet `2531920104`) | **P16** |
 | `Příjem Premier` | protiúčet `2401715997` (Tomáš, "Příjmový Vlhká 9") | **P8** „PLUS zvláštní příjem \| Služby PremierHost" |
+| `Prostory Příjem` (nová, 10/2026) | příjmová strana nájmu prostor (X.01/E03/E09), protějšek výdajové `Prostory` (N73). Protiúčet je firemní účet SDÍLENÝ s převody (např. RD Výdajový 1 `2901813198`), nejde odlišit deterministicky — rozhodne AI podle Poznámky („prostor sloužící podnikání"). Přežívá interní-převod/výchozí přepis přes `KATEGORIE_PREZIJI_INTERNI_PREVOD`; přidáno do uzavřeného seznamu Nesty Příjmový (`2301240402`) | **P4** (sdílí s `Ostatní ubytování CZK`) |
 | `Hotovost` (nová, 08/2026) | rozhodnutí uživatele: na příjmovém účtu Pokladny je to JEDINÁ povolená kategorie (`OMEZENE_KATEGORIE_PODLE_UCTU`) | **P11** „Hotovost" (dřív „Faktura Hotově CZK") |
 
 Plus stávající `Airbnb` (P2) a `Příjem energie` (P16, sdílí řádek s

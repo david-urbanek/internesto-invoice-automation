@@ -22,6 +22,7 @@ from .prepisy import (
     aplikuj_jidlo_pokladna,
     aplikuj_jmena_pokladna,
     aplikuj_kotlarska_pronajem_bytu,
+    aplikuj_prostory_nesty_prijmovy,
     aplikuj_pradlo_pokladna,
     aplikuj_prevod_zpetna_platba,
     aplikuj_radek_formulare,
@@ -86,6 +87,7 @@ def zpracuj_job_core(
     )
     transakce = aplikuj_interni_prevod(transakce)
     transakce = aplikuj_kotlarska_pronajem_bytu(transakce, job["vstup"], firma_nazev)
+    transakce = aplikuj_prostory_nesty_prijmovy(transakce, job["vstup"], firma_nazev)
     transakce = aplikuj_jidlo_podle_provedl(transakce, job["vstup"], firma_nazev)
     transakce = aplikuj_pradlo_pokladna(transakce, firma_nazev)
     transakce = aplikuj_jmena_pokladna(transakce, firma_nazev)

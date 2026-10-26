@@ -135,7 +135,7 @@ Jeden vzorec, roztažený přes celou mřížku C2:N82, na všech čtyřech list
 | Booking | 22 | Socka | 56 |
 | Kotlářská | 25 | Zdravka | 57 |
 | V19 | 27 | FU (srážková daň) | 58 |
-| A82 | 29 | Snídaně | 59 |
+| A82 | 29 | Snídaně Výdaj | 59 |
 | V24 | 31 | Taxi | 60 |
 | Arteon (auto leasing) | 39 | Jídlo | 62 |
 | Benzín | 40 | Dekorace | 63 |
@@ -192,7 +192,9 @@ Skript to sám nerozhodne, protože tu informaci nemá.
 | 16 | Ostatní příjmy |
 
 Z příjmů skript zná jen `Airbnb` (ř. 2), `Příjem energie` (od 08/2026
-namapováno na ř. 16, sdílí s `Ostatní příjmy`), `Kauce`, `Vratka`.
+namapováno na ř. 16, sdílí s `Ostatní příjmy`), `Kauce`, `Vratka` a od
+10/2026 `Snídaně Příjem` (ř. **P18** „Snídaně", protějšek výdajové
+`Snídaně Výdaj` → N59; na účtu Nesty Příjmový, viz `config.py`).
 
 Dále chybí: 30 (Nájem Fond A24-A83), 33 (Parkování), 36 (Nemoc),
 67 (Jiná propagace), 69 (Služby spojené s hostem).

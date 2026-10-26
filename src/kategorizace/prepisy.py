@@ -33,6 +33,12 @@ přepíše kategorii na "Kotlářská" u transakcí se štítkem "pronájem bytu
 v Poznámce, bez ohledu na to, co AI vybrala podle protiúčtu (často sdíleného
 s Casa Libre Příjmový, což ji svádí k obecnému "Převod").
 
+aplikuj_prostory_nesty_prijmovy – na účtu Nesty Příjmový přepíše příchozí
+platbu na "Prostory Příjem", když protiúčet patří RD (RD_UCTY) A text zmiňuje
+"prostor". Obě podmínky nutné: RD protiúčet nese i běžné převody, text
+"prostor" se objevuje i u ubytování od externích hostů. Běží po
+aplikuj_interni_prevod (ten je nejdřív označí "Převod").
+
 aplikuj_prevod_zpetna_platba – pokud se na stejném protiúčtu vrátí stejná
 částka opačným směrem (typicky u protiúčtů kategorie "Splátka"), nejde
 o splátku úvěru, ale o interní přesun peněz (např. půjčka/vratka společníka
@@ -60,12 +66,15 @@ from .config import (
     JIDLO_PODLE_PROVEDL,
     KATEGORIE,
     KATEGORIE_PREPIS_PODLE_PROVEDL,
+    KATEGORIE_PREZIJI_INTERNI_PREVOD,
     KATEGORIE_PRIJMOVE,
     KLICOVA_SLOVA_KOTLARSKA_RD_PRIJMOVY,
     MAPOVANI_NA_FORMULAR,
     OMEZENE_KATEGORIE_PODLE_UCTU,
     POKLADNA_JMENA_KATEGORIE,
+    RD_UCTY,
     UCET_NESTY_OSTATNI,
+    UCET_NESTY_PRIJMOVY,
     UCET_RD_PRIJMOVY,
     UCET_TMOBILE,
     VYJIMKY_VZDY_DODAVATEL,
@@ -122,6 +131,7 @@ def aplikuj_interni_prevod(transakce: list[dict]) -> list[dict]:
         if (
             kategorie == "Převod"
             or kategorie in povolene_kategorie.get(protiucet, set())
+            or kategorie in KATEGORIE_PREZIJI_INTERNI_PREVOD
             or puvodni_poznamka.startswith(POZNAMKA_STITEK_PREFIX)
         ):
             continue
@@ -159,7 +169,10 @@ def _soubor_patri_uctu(nazev_souboru: str, cislo_uctu: str, klicove_slovo: str) 
     if m and cislo_uctu and m.group(1) == cislo_uctu:
         return True
 
-    return klicove_slovo in _bez_diakritiky(zaklad)
+    # Oddělovače (-, _, .) sjednotit na mezeru, aby klíčové slovo "casa prijmovy"
+    # trefilo i názvy jako "09-2026-casa-prijmovy-1" (backtest / data/<mesic>/).
+    text = _bez_diakritiky(zaklad).replace("-", " ").replace("_", " ").replace(".", " ")
+    return klicove_slovo in text
 
 
 def _je_ucet_ostatni(nazev_souboru: str) -> bool:
@@ -168,15 +181,21 @@ def _je_ucet_ostatni(nazev_souboru: str) -> bool:
 
 def _slozka_prijem_vydaj(nazev_souboru: str) -> str | None:
     """
-    Pozná podle rodičovské složky, jestli výpis patří do transactions/Prijmove
-    nebo transactions/Vydajove. Vrátí "prijmove" / "vydajove" / None (soubor
-    leží přímo v transactions/, bez rozdělení).
+    Pozná směr výpisu "prijmove" / "vydajove" / None:
+      1. podle rodičovské složky transactions/Prijmove nebo /Vydajove,
+      2. jako záloha podle názvu souboru (token "prijmov"/"vydajov"), když výpis
+         leží ploše (např. backtest data/<mesic>/09-2026-rd-vydajovy-1.xlsx).
     """
     slozka = _bez_diakritiky(os.path.basename(os.path.dirname(nazev_souboru)))
     if slozka == "prijmove":
         return "prijmove"
     if slozka == "vydajove":
         return "vydajove"
+    zaklad = _bez_diakritiky(os.path.basename(nazev_souboru))
+    if "vydajov" in zaklad:
+        return "vydajove"
+    if "prijmov" in zaklad:
+        return "prijmove"
     return None
 
 def omezene_kategorie_pro_soubor(nazev_souboru: str) -> list[str] | None:
@@ -236,16 +255,19 @@ def aplikuj_vychozi_kategorii_ucet(
             continue
         if not _soubor_patri_uctu(nazev_souboru, klic, zaznam["klicove_slovo"]):
             continue
+        povolene = set(zaznam.get("kategorie") or [])
         for t in transakce:
             kategorie = t.get("Kategorie", "")
-            # "Mamka nájem" (deterministika.py, protiúčet 1751450015) je
-            # záměrně jiná kategorie než "vychozi" – soukromá platba od
-            # Michaely Dančové, ne příjem firmy z ubytování.
-            # "Úrok" a "Vratka" (08/2026) jsou povolené i na příjmových
-            # účtech (kreditní úrok z bankovního zůstatku, resp. vrácení
-            # platby hostovi) – viz OMEZENE_KATEGORIE_PODLE_UCTU, nesmí je
-            # přepsat na "vychozi".
-            if kategorie in (vychozi, "Převod", "Mamka nájem", "Úrok", "Vratka"):
+            # Nepřepisovat kategorie legitimně povolené pro tento účet
+            # (zaznam["kategorie"] – např. Airbnb, Snídaně Příjem, Mamka nájem,
+            # Úrok, Vratka), "Převod" (nepřepisuje se ani tam, kde v seznamu
+            # není – Nesty), ani kategorie přežívající interní převod (Prostory
+            # Příjem). vychozi je jen pro Neurčeno / zbytkové chyby.
+            if (
+                kategorie in (vychozi, "Převod")
+                or kategorie in povolene
+                or kategorie in KATEGORIE_PREZIJI_INTERNI_PREVOD
+            ):
                 continue
             puvodni_poznamka = t.get("Poznamka", "")
             t["Kategorie"] = vychozi
@@ -284,6 +306,48 @@ def aplikuj_kotlarska_pronajem_bytu(
             t["Poznamka"] = (
                 f"{puvodni_poznamka} Přepsáno z '{puvodni_kategorie}' na 'Kotlářská' – "
                 f"účet RD Příjmový a štítek 'pronájem bytu' vždy patří k nájmu Kotlářská."
+            ).strip()
+
+    return transakce
+
+
+def aplikuj_prostory_nesty_prijmovy(
+    transakce: list[dict],
+    nazev_souboru: str,
+    firma_nazev: str,
+) -> list[dict]:
+    """
+    Na účtu Nesty Příjmový přepíše příchozí platbu na "Prostory Příjem", když
+    protiúčet patří firmě RD (RD_UCTY) A text zmiňuje "prostor" (nájem prostor
+    X.01/E03/E09). Musí běžet AŽ PO aplikuj_interni_prevod – ten tyhle platby
+    (firemní protiúčet) nejdřív označí "Převod", tohle je přepíše zpátky.
+
+    Obě podmínky jsou nutné: samotný RD protiúčet nese i běžné interní převody
+    (RD Příjmový → Nesty) bez nájmu prostor, a samotný text "prostor" se
+    objevuje i u nájmu ubytování od externích hostů (jiný protiúčet).
+    """
+    if firma_nazev != "Nesty" or not _soubor_patri_uctu(
+        nazev_souboru, UCET_NESTY_PRIJMOVY, "nesty prijmov"
+    ):
+        return transakce
+
+    for t in transakce:
+        if _protiucet(t) not in RD_UCTY:
+            continue
+        if "prostor" not in _bez_diakritiky(_text_transakce(t)):
+            continue
+        castka = _parsuj_castku(t.get("Objem", ""))
+        if castka is None or castka <= 0:
+            continue  # Prostory Příjem je příjem – odchozí platby ignoruj
+        if t.get("Kategorie") != "Prostory Příjem":
+            puvodni_poznamka = t.get("Poznamka", "")
+            puvodni_kategorie = t.get("Kategorie")
+            t["Kategorie"] = "Prostory Příjem"
+            t["Jistota kategorie"] = 100
+            t["Poznamka"] = (
+                f"{puvodni_poznamka} Přepsáno z '{puvodni_kategorie}' na "
+                f"'Prostory Příjem' – Nesty Příjmový, protiúčet z RD a text "
+                f"'prostor' (nájem prostor sloužících podnikání)."
             ).strip()
 
     return transakce
@@ -379,8 +443,8 @@ def aplikuj_jmena_pokladna(transakce: list[dict], firma_nazev: str) -> list[dict
 def aplikuj_jidlo_pokladna(transakce: list[dict], firma_nazev: str) -> list[dict]:
     """
     Na Pokladně hotovostní nákupy pečiva/snídaní ("Ostatní - pečivo, snídaně")
-    patří do "Jídlo", ne "Snídaně" – rozhodnutí uživatele 07/2026. Kategorie
-    "Snídaně" je pro fakturované snídaně, ne drobné hotovostní nákupy.
+    patří do "Jídlo", ne "Snídaně Výdaj" – rozhodnutí uživatele 07/2026. Kategorie
+    "Snídaně Výdaj" je pro fakturované snídaně, ne drobné hotovostní nákupy.
     """
     if firma_nazev != "Pokladna":
         return transakce

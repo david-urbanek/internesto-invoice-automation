@@ -98,8 +98,14 @@ def aplikuj_deterministickou_kategorizaci(
 
         text = " ".join(
             str(t.get(k) or "")
-            for k in ("Poznámka", "Zpráva pro příjemce", "Název protiúčtu")
+            for k in ("Poznámka", "Zpráva pro příjemce", "Název protiúčtu", "Typ transakce")
         ).casefold()
+        # VZDY_TEXT_KATEGORIE markery respektují povolena() (uzavřený seznam
+        # účtu / složka Prijmove|Vydajove): na příjmovém účtu se "comgate"
+        # (±1 Kč identifikace → Převod) nesmí vnutit velkým Booking výplatám
+        # přes Comgate. Popis Raiffeisenu bývá ve sloupci "Typ transakce",
+        # proto je taky v prohledávaném textu (jinak marker "úrok z úvěru"
+        # na RB výpisu nic netrefí).
         for marker, kat_marker in VZDY_TEXT_KATEGORIE.items():
             if marker in text and povolena(kat_marker):
                 t["Kategorie"] = kat_marker

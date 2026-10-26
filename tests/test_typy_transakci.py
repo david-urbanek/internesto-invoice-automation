@@ -13,6 +13,7 @@ from kategorizace.io import nacti_xlsx
 from kategorizace.prepisy import (
     aplikuj_interni_prevod,
     aplikuj_jmena_pokladna,
+    aplikuj_prostory_nesty_prijmovy,
     aplikuj_vzdy_dodavatel,
 )
 
@@ -84,15 +85,60 @@ class TransactionValueTypeTests(unittest.TestCase):
         self.assertEqual(row["Název protiúčtu"], "")
 
     def test_raiffeisen_interest_descriptions_are_deterministic(self):
+        # Raiffeisen dává popis do sloupce "Typ transakce" (ne "Poznámka"),
+        # takže marker "úrok z úvěru" musí hledat i tam. Regrese z 10/2026:
+        # dřív se pole neprohledávalo a úroky končily jako "Neurčeno".
         rows = [
-            {"Název protiúčtu": "Úrok z úvěru"},
-            {"Název protiúčtu": "Úrok z nevyčerpaného úvěru"},
+            {"Typ transakce": "Úrok z úvěru", "Poznámka": "Úrok 09/2026"},
+            {"Typ transakce": "Úrok z nevyčerpaného úvěru", "Poznámka": "Úrok 09/2026"},
         ]
 
         result = aplikuj_deterministickou_kategorizaci(rows)
 
         self.assertEqual([row.get("Kategorie") for row in result], ["Úrok", "Úrok"])
+        self.assertEqual([row.get("Jistota kategorie") for row in result], [100, 100])
         self.assertEqual(MAPOVANI_NA_FORMULAR["Úrok"], "N49")
+
+    def test_text_markers_respect_account_restriction(self):
+        # Marker se nesmí vnutit, když kategorie není v povoleném seznamu účtu:
+        # jinak by "comgate" (±1 Kč identifikace → Převod) přebil velké Booking
+        # výplaty přes Comgate na příjmovém účtu. Takový řádek jde do AI.
+        prijmove = [k["nazev"] for k in KATEGORIE_PRIJMOVE]
+        self.assertNotIn("Převod", prijmove)
+        rows = [{"Poznámka": "Comgate a.s.", "Objem": "115865,58"}]
+
+        aplikuj_deterministickou_kategorizaci(rows, omezene_kategorie=prijmove)
+
+        self.assertIsNone(rows[0].get("Kategorie"))
+
+    def test_prostory_nesty_requires_rd_account_and_prostor_text(self):
+        # "Prostory Příjem" jen na Nesty Příjmový a jen když je protiúčet z RD
+        # A text zmiňuje "prostor". RD protiúčet bez textu = běžný převod;
+        # "prostor" od externího hosta (jiný protiúčet) = ubytování.
+        rows = [
+            {"Protiúčet": "2901813198", "Objem": "24200",
+             "Zpráva pro příjemce": "Nájem - prostor sloužící podnikání", "Kategorie": "Převod"},
+            {"Protiúčet": "2200973033", "Objem": "115920",
+             "Zpráva pro příjemce": "", "Kategorie": "Převod"},
+            {"Protiúčet": "123-9105550237", "Objem": "14116",
+             "Zpráva pro příjemce": "Pronajem prostor", "Kategorie": "Ostatní ubytování CZK"},
+            {"Protiúčet": "2901813198", "Objem": "-5000",
+             "Zpráva pro příjemce": "prostor", "Kategorie": "Převod"},
+        ]
+
+        aplikuj_prostory_nesty_prijmovy(rows, "09-2026-nesty-prijmovy-1.xlsx", "Nesty")
+
+        self.assertEqual(
+            [r["Kategorie"] for r in rows],
+            ["Prostory Příjem", "Převod", "Ostatní ubytování CZK", "Převod"],
+        )
+        self.assertEqual(MAPOVANI_NA_FORMULAR["Prostory Příjem"], "P4")
+
+    def test_prostory_nesty_skips_other_accounts(self):
+        rows = [{"Protiúčet": "2901813198", "Objem": "24200",
+                 "Zpráva pro příjemce": "prostor", "Kategorie": "Převod"}]
+        aplikuj_prostory_nesty_prijmovy(rows, "09-2026-nesty-vydajovy-1.xlsx", "Nesty")
+        self.assertEqual(rows[0]["Kategorie"], "Převod")
 
     def test_pricelabs_merchant_has_own_category_and_row(self):
         result = aplikuj_vzdy_dodavatel(
