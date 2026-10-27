@@ -606,29 +606,44 @@ def aplikuj_vzdy_dodavatel(
     return transakce
 
 
+# Suffix řádku, který signalizuje "člověk MUSÍ doplnit ručně" (kategorie
+# mimo MAPOVANI_NA_FORMULAR – Neurčeno, prázdná, neznámý štítek). Odlišuje
+# je od vědomě nenamapovaných interních toků (None v mapě → čisté P00/N00).
+RADEK_RUCNI_SUFFIX = "*"
+_CHYBI_V_MAPE = object()
+
+
 def _radek_pro_kategorii(kategorie: str, objem: str | None, mena: str | None) -> str:
     """
     Namapuje kategorii na ID řádku Alokačního formuláře (config.MAPOVANI_NA_FORMULAR).
 
-    "P<n>" = příjmový řádek, "N<n>" = výdajový řádek. Kategorie, které nejsou
-    v MAPOVANI_NA_FORMULAR vůbec, nebo mají hodnotu None (vědomě bez řádku /
-    čeká na klienta – viz docs/otazky-pro-klienta.md), dostanou "P00"/"N00"
-    podle toho, zda kategorie patří mezi příjmové, nebo výdajové – peníze se
-    tak nikdy neztratí potichu, jen se objeví jako nenamapované.
+    "P<n>" = příjmový řádek, "N<n>" = výdajový řádek.
+
+    Dvě různé "nenamapované" situace se ODLIŠUJÍ, ať člověk ví, co dořešit:
+      - kategorie NENÍ v MAPOVANI_NA_FORMULAR vůbec (Neurčeno, prázdná,
+        neznámý štítek) → "P00*"/"N00*" s hvězdičkou: AI/štítek nestačily,
+        řádek MUSÍ doplnit člověk ručně;
+      - kategorie je v mapě s hodnotou None (vědomě bez řádku – interní tok
+        jako Převod/Kauce/Rezervní nebo čeká na klienta, viz
+        docs/otazky-pro-klienta.md) → "P00"/"N00" BEZ hvězdičky: je to
+        záměrné, nic se nedoplňuje.
+    Peníze se tak nikdy neztratí potichu a ruční práce je na první pohled vidět.
     """
     prefix = "P" if kategorie in _KATEGORIE_PRIJMOVE_NAZVY else "N"
     nenamapovano = f"{prefix}00"
-    cil = MAPOVANI_NA_FORMULAR.get(kategorie)
+    rucni = nenamapovano + RADEK_RUCNI_SUFFIX
+    cil = MAPOVANI_NA_FORMULAR.get(kategorie, _CHYBI_V_MAPE)
+    if cil is _CHYBI_V_MAPE:
+        return rucni
     if cil is None:
         return nenamapovano
     if isinstance(cil, str):
         return cil
     if "+" in cil or "-" in cil:
         castka = _parsuj_castku(objem) or 0.0
-        return cil.get("+" if castka >= 0 else "-", nenamapovano)
+        return cil.get("+" if castka >= 0 else "-", rucni)
     # currency-keyed dict, např. {"CZK": "P4", "EUR": "P6"}
-    return cil.get((mena or "CZK").strip().upper(), nenamapovano)
-
+    return cil.get((mena or "CZK").strip().upper(), rucni)
 
 def aplikuj_radek_formulare(transakce: list[dict], firma_nazev: str) -> list[dict]:
     """

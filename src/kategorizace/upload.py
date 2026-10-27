@@ -217,7 +217,7 @@ def zpracuj_soubor(cesta: str, nenamapovane_globalne: Counter) -> str:
             mena = _s(ws.cell(row=r, column=mena_col).value) if mena_col else ""
             radek_formulare = _radek_pro_kategorii(kategorie, objem, mena)
             vysledky.append((r, kategorie, radek_formulare))
-            if radek_formulare.endswith("00") and kategorie:
+            if radek_formulare.rstrip("*").endswith("00") and kategorie:
                 nenamapovane_lokalne[kategorie] += 1
 
         # Validace starých výpisů: má vybraný sloupec opravdu kategorie?
@@ -248,7 +248,7 @@ def zpracuj_soubor(cesta: str, nenamapovane_globalne: Counter) -> str:
         wb.save(cesta)
         nenamapovane_globalne.update(nenamapovane_lokalne)
 
-        nenamapovano = sum(1 for _, _, rf in vysledky if rf.endswith("00"))
+        nenamapovano = sum(1 for _, _, rf in vysledky if rf.rstrip("*").endswith("00"))
         detaily = []
         if not prepocet and je_cerven:
             detaily.append("červen")

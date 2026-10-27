@@ -79,10 +79,13 @@ def main():
                 fieldnames.append(novy_sloupec)
 
         _uloz_csv(cesta, fieldnames, radky)
-        nenamapovano = sum(1 for r in radky if r.get("Radek", "").endswith("00"))
+        nenamapovano = sum(
+            1 for r in radky if r.get("Radek", "").rstrip("*").endswith("00")
+        )
+        k_doplneni = sum(1 for r in radky if r.get("Radek", "").endswith("*"))
         console.print(
             f"[green]OK[/] {cesta}  ({len(radky)} transakcí, "
-            f"{nenamapovano} nenamapováno)"
+            f"{nenamapovano} nenamapováno, z toho {k_doplneni} k ručnímu doplnění *)"
         )
         celkem_transakci += len(radky)
 

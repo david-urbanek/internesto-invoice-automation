@@ -46,12 +46,13 @@ function aktualizujTransakce() {
 
   zapisDoTransakce(vsechnyRadky);
 
-  const nenamapovano = vsechnyRadky.filter(r => String(r.Radek || '').endsWith('00')).length;
+  const nenamapovano = vsechnyRadky.filter(r => String(r.Radek || '').replace(/\*$/, '').endsWith('00')).length;
+  const kDoplneni = vsechnyRadky.filter(r => String(r.Radek || '').endsWith('*')).length;
   const mesicFallback = vsechnyRadky.filter(r => r._mesicZNazvu).length;
   const zprava = [
     `Souborů zpracováno: ${pocetSouboru}`,
     `Transakcí celkem: ${vsechnyRadky.length}`,
-    `Nenamapováno na řádek formuláře (R00): ${nenamapovano}`,
+    `Nenamapováno na řádek formuláře (R00): ${nenamapovano}, z toho k ručnímu doplnění (*): ${kDoplneni}`,
     `Mesic dopočítán z názvu souboru (nešlo parsovat Datum): ${mesicFallback}`,
     chyby.length ? `\nCHYBY (soubor přeskočen, zbytek pokračoval):\n${chyby.join('\n')}` : 'Bez chyb.',
   ].join('\n');
